@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>CPR 節奏訓練系統：黃金四分鐘 (行動觸控版)</title>
+  <style>
+    :root {
+      --bg-dark: #0b1120;
+      --panel-bg: #111827;
+      --panel-border: #1f2937;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --accent-blue: #38bdf8;
+      --accent-green: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", sans-serif;
+      touch-action: manipulation;
+    }
+
+    .app-shell {
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+    }
+
+    /* 頂部控制列 */
+    .top-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      padding: 8px 10px;
+      background: #0f172a;
+      border-bottom: 1px solid var(--panel-border);
+      z-index: 20;
+    }
+
+    .brand-title {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--accent-blue);
+    }
+
+    .badge-mobile {
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-blue);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+    }
+
+    .controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .pill-group {
+      display: flex;
+      background: #1e293b;
+      border-radius: 8px;
+      padding: 2px;
+      border: 1px solid #334155;
+    }
+
+    .pill-btn {
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 5px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .pill-btn.active {
+      background: var(--accent-blue);
+      color: #0f172a;
+    }
+
+    .pill-btn.active-green {
+      background: var(--accent-green);
+      color: #06281e;
+    }
+
+    .action-btn {
+      border: 1px solid #334155;
+      background: #1e293b;
+      color: var(--text-main);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 5px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .action-btn.pause-btn {
+      background: rgba(245, 158, 11, 0.18);
+      border-color: var(--accent-amber);
+      color: #fbbf24;
+    }
+
+    /* 中央主視覺區 (橫向左右排列，直向自動上下排列) */
+    .main-stage {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1.05fr 1.35fr 1fr;
+      gap: 8px;
+      padding: 8px 10px;
+      min-height: 0;
+    }
+
+    @media (max-width: 768px) and (orientation: portrait) {
+      .main-stage {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1.15fr 0.85fr;
+      }
+      .center-panel {
+        grid-column: 1 / -1;
+        order: -1;
+      }
+    }
+
+    .card {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card-header {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    /* 左側：機構剖面 + LED 霹靂燈 */
+    .hw-visual-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      gap: 8px;
+      min-height: 0;
+    }
+
+    .pump-rig {
+      position: relative;
+      width: 110px;
+      height: 140px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .red-pad {
+      width: 82px;
+      height: 18px;
+      background: linear-gradient(180deg, #f87171, #dc2626);
+      border-radius: 6px 6px 2px 2px;
+      border: 1px solid #fca5a5;
+      z-index: 3;
+      transition: transform 0.06s ease-out;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+    }
+
+    .yellow-bellows {
+      width: 74px;
+      height: 88px;
+      background: repeating-linear-gradient(
+        180deg,
+        #facc15 0px,
+        #eab308 10px,
+        #ca8a04 14px,
+        #fde047 18px
+      );
+      border-radius: 4px;
+      transform-origin: bottom center;
+      transition: transform 0.06s ease-out;
+    }
+
+    .blue-base {
+      width: 104px;
+      height: 14px;
+      background: #0284c7;
+      border-radius: 4px;
+      position: relative;
+    }
+
+    .sensor-pillar {
+      position: absolute;
+      right: 4px;
+      bottom: 14px;
+      width: 18px;
+      height: 106px;
+      background: #0369a1;
+      border-radius: 4px 4px 0 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 6px 3px;
+      align-items: center;
+    }
+
+    .ldr-dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 3px;
+      background: #312e81;
+      border: 1px solid #818cf8;
+      transition: all 0.08s;
+    }
+
+    .ldr-dot.lit {
+      background: #fde047;
+      box-shadow: 0 0 8px #fde047;
+      border-color: #fff;
+    }
+
+    .ldr-status-list {
+      font-size: 10px;
+      line-height: 1.45;
+      color: var(--text-muted);
+    }
+
+    /* 12顆 LED 霹靂燈柱 (壓下上升、回彈下降) */
+    .led-tower {
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 3px;
+      background: #090d16;
+      padding: 5px;
+      border-radius: 8px;
+      border: 1px solid #1e293b;
+      height: 140px;
+      justify-content: space-between;
+    }
+
+    .led-cell {
+      width: 18px;
+      height: 7px;
+      border-radius: 2px;
+      background: #1e293b;
+      transition: background 0.04s, box-shadow 0.04s;
+    }
+
+    .led-cell.on-low { background: #38bdf8; box-shadow: 0 0 6px #38bdf8; }
+    .led-cell.on-mid { background: #facc15; box-shadow: 0 0 6px #facc15; }
+    .led-cell.on-high { background: #10b981; box-shadow: 0 0 8px #10b981; }
+    .led-cell.on-peak { background: #ef4444; box-shadow: 0 0 10px #ef4444; }
+
+    /* 中央畫布區 */
+    .canvas-container {
+      flex: 1;
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      background: #080c14;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .judgment-toast {
+      position: absolute;
+      top: 18%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      text-shadow: 0 2px 12px rgba(0,0,0,0.85);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    /* 右側生理監視器數據 */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      flex: 1;
+    }
+
+    .metric-box {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 6px 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .metric-label {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .metric-val {
+      font-size: 20px;
+      font-weight: 800;
+      line-height: 1.15;
+      margin-top: 2px;
+    }
+
+    .metric-sub {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* 底部行動端專屬觸控區 */
+    .touch-deck {
+      display: grid;
+      grid-template-columns: 0.85fr 1.8fr 0.85fr;
+      gap: 8px;
+      padding: 8px 10px 10px;
+      background: #0f172a;
+      border-top: 1px solid var(--panel-border);
+    }
+
+    .touch-btn {
+      border: none;
+      border-radius: 14px;
+      font-weight: 800;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 6px;
+      cursor: pointer;
+      transition: transform 0.05s, filter 0.05s;
+    }
+
+    .touch-btn:active, .touch-btn.pressed {
+      transform: scale(0.96);
+      filter: brightness(1.15);
+    }
+
+    .btn-shallow {
+      background: linear-gradient(180deg, #d97706, #b45309);
+      font-size: 13px;
+    }
+
+    .btn-main-press {
+      background: linear-gradient(180deg, #ef4444, #b91c1c);
+      box-shadow: 0 4px 16px rgba(239, 68, 68, 0.35);
+      font-size: 17px;
+      border: 1px solid rgba(254, 202, 202, 0.4);
+    }
+
+    .btn-recoil {
+      background: linear-gradient(180deg, #7c3aed, #5b21b6);
+      font-size: 13px;
+    }
+
+    .btn-hint {
+      font-size: 10px;
+      font-weight: 500;
+      opacity: 0.85;
+      margin-top: 2px;
+    }
+
+    /* 彈出視窗 (開始 / 暫停 / 結算) */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(3, 7, 18, 0.84);
+      backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 16px;
+    }
+
+    .modal-overlay.hidden {
+      display: none;
+    }
+
+    .modal-card {
+      background: #111827;
+      border: 1px solid #374151;
+      border-radius: 16px;
+      max-width: 440px;
+      width: 100%;
+      padding: 20px;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+    }
+
+    .modal-title {
+      font-size: 20px;
+      font-weight: 900;
+      color: var(--accent-blue);
+      margin-bottom: 8px;
+    }
+
+    .modal-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 14px;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 14px;
+      text-align: left;
+    }
+
+    .summary-item {
+      background: #1f2937;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+    }
+
+    .summary-item strong {
+      display: block;
+      font-size: 16px;
+      color: #fff;
+      margin-top: 2px;
+    }
+
+    .modal-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .modal-btn {
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      border: none;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .modal-btn-primary {
+      background: var(--accent-green);
+      color: #052e16;
+    }
+
+    .modal-btn-secondary {
+      background: #374151;
+      color: #f3f4f6;
+    }
+
+    .modal-btn-amber {
+      background: var(--accent-amber);
+      color: #1f1300;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <!-- 頂部控制列 -->
+    <header class="top-bar">
+      <div class="brand-title">
+        <span>🫀 黃金四分鐘 CPR</span>
+        <span class="badge-mobile" id="envBadge">📱 行動觸控版</span>
+      </div>
+
+      <div class="controls-row">
+        <!-- 遊戲 / 空壓測驗模式 -->
+        <div class="pill-group" id="modeGroup">
+          <button class="pill-btn active" data-mode="game">🎮 節奏遊戲</button>
+          <button class="pill-btn" data-mode="empty">🩺 空壓測驗</button>
+        </div>
+
+        <!-- 時間模式 -->
+        <div class="pill-group" id="timeGroup">
+          <button class="pill-btn" data-sec="10">10s</button>
+          <button class="pill-btn active" data-sec="30">30s</button>
+          <button class="pill-btn" data-sec="60">60s</button>
+          <button class="pill-btn" data-sec="0">∞ 無盡</button>
+        </div>
+
+        <!-- BPM 模式 -->
+        <div class="pill-group" id="bpmGroup">
+          <button class="pill-btn" data-bpm="100">100</button>
+          <button class="pill-btn active" data-bpm="110">110</button>
+          <button class="pill-btn" data-bpm="120">120</button>
+          <button class="pill-btn" data-bpm="range">100~120區間</button>
+        </div>
+
+        <button class="action-btn" id="btnFullscreen" title="切換全螢幕">⛶ 全螢幕</button>
+        <button class="action-btn pause-btn" id="btnPause">⏸ 暫停</button>
+      </div>
+    </header>
+
+    <!-- 中央主視覺區 -->
+    <main class="main-stage">
+      <!-- 左側：」字型半開放機構與 LED 霹靂燈 -->
+      <section class="card">
+        <div class="card-header">
+          <span>」型機構與雙 LDR</span>
+          <span>霹靂燈升降</span>
+        </div>
+        <div class="hw-visual-wrap">
+          <div class="pump-rig">
+            <div class="red-pad" id="redPad"></div>
+            <div class="yellow-bellows" id="yellowBellows"></div>
+            <div class="blue-base">
+              <div class="sensor-pillar">
+                <div class="ldr-dot" id="topLdr" title="上LDR (回彈遮蔽)"></div>
+                <div class="ldr-dot" id="botLdr" title="下LDR (5-6cm深度觸發)"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="ldr-status-list">
+            <div>上LDR: <strong id="txtTopLdr" style="color:#9ca3af">遮光(0)</strong></div>
+            <div>下LDR: <strong id="txtBotLdr" style="color:#9ca3af">暗盒(0)</strong></div>
+            <div style="margin-top:6px; color:#38bdf8;">壓下 ▲ 上升<br/>回彈 ▼ 下降</div>
+          </div>
+
+          <!-- 12顆 LED 霹靂燈 -->
+          <div class="led-tower" id="ledTower"></div>
+        </div>
+      </section>
+
+      <!-- 中央：節奏音符軌道 / 空壓測驗即時折線圖 -->
+      <section class="card center-panel">
+        <div class="card-header">
+          <span id="centerTitle">🎵 節拍判定軌道 (目標: 110 BPM)</span>
+          <span id="timerDisplay" style="color:#38bdf8; font-weight:800;">剩餘 30.0s</span>
+        </div>
+        <div class="canvas-container">
+          <canvas id="stageCanvas"></canvas>
+          <div class="judgment-toast" id="judgmentToast">PERFECT!</div>
+        </div>
+      </section>
+
+      <!-- 右側：生理監視器與實測 BPM -->
+      <section class="card">
+        <div class="card-header">
+          <span>📊 急救生理監視器</span>
+          <span id="statusTag" style="color:#10b981;">準備就緒</span>
+        </div>
+        <div class="metrics-grid">
+          <div class="metric-box">
+            <span class="metric-label">你的即時 BPM</span>
+            <span class="metric-val" id="liveBpmVal" style="color:#38bdf8;">--</span>
+            <span class="metric-sub">標準: 100~120</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">累計平均 BPM</span>
+            <span class="metric-val" id="avgBpmVal" style="color:#10b981;">--</span>
+            <span class="metric-sub" id="zoneRatioTxt">區間命中: 0%</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">有效按壓準確率</span>
+            <span class="metric-val" id="accVal" style="color:#facc15;">100%</span>
+            <span class="metric-sub">及格門檻: 80%</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">連續完美 (Combo)</span>
+            <span class="metric-val" id="comboVal" style="color:#f472b6;">0</span>
+            <span class="metric-sub" id="totalCountTxt">總按壓: 0 下</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- 底部行動端專屬觸控區 -->
+    <footer class="touch-deck">
+      <button class="touch-btn btn-shallow" id="touchShallow">
+        <span>⚠️ 過淺 (S)</span>
+        <span class="btn-hint">未達 5cm</span>
+      </button>
+
+      <button class="touch-btn btn-main-press" id="touchPress">
+        <span>🫀 按住按壓 / 放開回彈</span>
+        <span class="btn-hint">對應實體氣囊下壓 5~6cm (Space)</span>
+      </button>
+
+      <button class="touch-btn btn-recoil" id="touchRecoil">
+        <span>⚠️ 未回彈 (E)</span>
+        <span class="btn-hint">上LDR未遮蔽</span>
+      </button>
+    </footer>
+  </div>
+
+  <!-- 開始前導引視窗 -->
+  <div class="modal-overlay" id="startModal">
+    <div class="modal-card">
+      <div class="modal-title">🫀 CPR 節奏訓練系統 (行動版)</div>
+      <p class="modal-desc">
+        請將手機或平板轉為<strong>橫向</strong>操作，並點擊下方「加入主畫面」可獲得最佳全螢幕體驗。<br/>
+        按住下方紅色按鈕模擬<strong>下壓 5~6cm（霹靂燈上升）</strong>，放開手指模擬<strong>完全回彈（霹靂燈下降）</strong>。
+      </p>
+      <div class="modal-actions">
+        <button class="modal-btn modal-btn-primary" id="btnStartGame">▶️ 開始訓練 (解鎖音效)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 智慧暫停視窗 -->
+  <div class="modal-overlay hidden" id="pauseModal">
+    <div class="modal-card">
+      <div class="modal-title" style="color:#fbbf24;">⏸ 訓練已暫停</div>
+      <p class="modal-desc" id="pauseGraceNote">
+        已自動檢查並扣除暫停前 1.25 秒內因手部離開螢幕而產生的 MISS 判定。
+      </p>
+      <div class="summary-grid">
+        <div class="summary-item">目前平均 BPM<strong id="pauseAvgBpm">--</strong></div>
+        <div class="summary-item">目前準確率<strong id="pauseAcc">100%</strong></div>
+      </div>
+      <div class="modal-actions">
+        <button class="modal-btn modal-btn-primary" id="btnResume">▶️ 繼續訓練</button>
+        <button class="modal-btn modal-btn-amber" id="btnFinishNow">📊 立即結算成績</button>
+        <button class="modal-btn modal-btn-secondary" id="btnRestartFromPause">🔄 重新開始</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 最終結算視窗 -->
+  <div class="modal-overlay hidden" id="resultModal">
+    <div class="modal-card">
+      <div class="modal-title" id="resultHeadline">🎉 急救成功！</div>
+      <p class="modal-desc" id="resultSubtext">按壓節奏與深度表現優異，成功維持腦部灌流！</p>
+      <div class="summary-grid">
+        <div class="summary-item">你的實測平均 BPM<strong id="resAvgBpm">--</strong></div>
+        <div class="summary-item">100~120 黃金區間比例<strong id="resZonePct">0%</strong></div>
+        <div class="summary-item">有效準確率 (門檻 80%)<strong id="resAcc">0%</strong></div>
+        <div class="summary-item">最高連擊 / 總按壓<strong id="resComboTotal">0 / 0</strong></div>
+        <div class="summary-item">Perfect / Good<strong id="resPG">0 / 0</strong></div>
+        <div class="summary-item">過淺 / 未回彈 / Miss<strong id="resErrors">0 / 0 / 0</strong></div>
+      </div>
+      <div class="modal-actions">
+        <button class="modal-btn modal-btn-primary" id="btnPlayAgain">🔄 再測一次</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 偵測環境顯示
+    const isSerialSupported = 'serial' in navigator;
+    if (!isSerialSupported) {
+      document.getElementById('envBadge').textContent = '📱 行動觸控模式';
+    }
+
+    // 初始化 12 顆 LED 霹靂燈 DOM
+    const ledTower = document.getElementById('ledTower');
+    const ledCells = [];
+    for (let i = 0; i < 12; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'led-cell';
+      ledTower.appendChild(cell);
+      ledCells.push(cell);
+    }
+
+    // 系統狀態
+    const state = {
+      mode: 'game',       // 'game' | 'empty'
+      duration: 30,       // 10 | 30 | 60 | 0 (endless)
+      bpmMode: '110',     // '100' | '110' | '120' | 'range'
+      running: false,
+      paused: false,
+      timeLeft: 30,
+      elapsed: 0,
+      isPressing: false,
+      holdType: 'normal', // 'normal' | 'shallow' | 'recoil'
+      ledLevel: 0,        // 0 ~ 12
+      lastPressTime: 0,
+      bpmList: [],
+      bpmHistory: [],     // { t, bpm }
+      notes: [],          // { targetTime, hit, missed }
+      nextNoteTime: 0,
+      stats: {
+        perfect: 0,
+        good: 0,
+        shallow: 0,
+        recoil: 0,
+        miss: 0,
+        combo: 0,
+        maxCombo: 0
+      },
+      recentMisses: []    // { time, prevCombo } 用於暫停回溯扣除
+    };
+
+    // Web Audio API 音效引擎 (行動端自動解鎖)
+    let audioCtx = null;
+    let beatStep = 0;
+
+    function unlockAudio() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          audioCtx = new AudioContextClass();
+        }
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function playBeatSound(isAccent) {
+      if (!audioCtx || state.mode !== 'game') return;
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = isAccent ? 'triangle' : 'sine';
+      osc.frequency.setValueAtTime(isAccent ? 587.33 : 440, now);
+      osc.frequency.exponentialRampToValueAtTime(110, now + 0.09);
+      gain.gain.setValueAtTime(isAccent ? 0.22 : 0.14, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.12);
+    }
+
+    function playPressClick(isGood) {
+      if (!audioCtx) return;
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(isGood ? 880 : 220, now);
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.07);
+    }
+
+    // 取得目前目標 BPM
+    function getTargetBpm() {
+      if (state.bpmMode === 'range') {
+        if (state.bpmList.length > 0) {
+          const last = state.bpmList[state.bpmList.length - 1];
+          return Math.min(120, Math.max(100, last));
+        }
+        return 110;
+      }
+      return parseInt(state.bpmMode, 10);
+    }
+
+    // 顯示判定文字
+    let toastTimer = null;
+    function showJudgment(text, color) {
+      const el = document.getElementById('judgmentToast');
+      el.textContent = text;
+      el.style.color = color;
+      el.style.opacity = '1';
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        el.style.opacity = '0';
+      }, 450);
+    }
+
+    // 更新機構動畫與 LDR 狀態
+    function updateHardwareVisual(level) {
+      const ratio = level / 12; // 0 ~ 1
+      const translateY = ratio * 34;
+      const scaleY = 1 - ratio * 0.38;
+
+      document.getElementById('redPad').style.transform = `translateY(${translateY}px)`;
+      document.getElementById('yellowBellows').style.transform = `scaleY(${scaleY})`;
+
+      const topLdr = document.getElementById('topLdr');
+      const botLdr = document.getElementById('botLdr');
+      const txtTop = document.getElementById('txtTopLdr');
+      const txtBot = document.getElementById('txtBotLdr');
+
+      // 上LDR：回彈時被紅色手壓板遮蔽(0)，壓下離開頂部見光(1)
+      if (level >= 2) {
+        topLdr.classList.add('lit');
+        txtTop.textContent = '見光(1)';
+        txtTop.style.color = '#fde047';
+      } else {
+        topLdr.classList.remove('lit');
+        txtTop.textContent = '遮光(0)';
+        txtTop.style.color = '#9ca3af';
+      }
+
+      // 下LDR：平常不見光(0)，壓深達 5~6cm (level >= 10) 時觸發(1)
+      if (level >= 10 && state.holdType !== 'shallow') {
+        botLdr.classList.add('lit');
+        txtBot.textContent = '觸發(1)';
+        txtBot.style.color = '#10b981';
+      } else {
+        botLdr.classList.remove('lit');
+        txtBot.textContent = '暗盒(0)';
+        txtBot.style.color = '#9ca3af';
+      }
+
+      // 更新 12 顆 LED 霹靂燈 (壓下上升、回彈下降)
+      const litCount = Math.round(level);
+      for (let i = 0; i < 12; i++) {
+        const cell = ledCells[i];
+        cell.className = 'led-cell';
+        if (i < litCount) {
+          if (i < 4) cell.classList.add('on-low');
+          else if (i < 8) cell.classList.add('on-mid');
+          else if (i < 11) cell.classList.add('on-high');
+          else cell.classList.add('on-peak');
+        }
+      }
+    }
+
+    // 處理按壓動作 (按下瞬間)
+    function triggerPressDown(type = 'normal') {
+      unlockAudio();
+      if (!state.running || state.paused) return;
+      if (state.isPressing) return;
+
+      state.isPressing = true;
+      state.holdType = type;
+
+      const now = performance.now() / 1000;
+
+      // 異常事件測試：過淺 (S) 或 未完全回彈 (E)
+      if (type === 'shallow') {
+        state.stats.shallow++;
+        state.stats.combo = 0;
+        playPressClick(false);
+        showJudgment('⚠️ 按壓過淺 (<5cm)', '#f59e0b');
+        updateStatsUI();
+        return;
+      }
+
+      if (type === 'recoil') {
+        state.stats.recoil++;
+        state.stats.combo = 0;
+        playPressClick(false);
+        showJudgment('⚠️ 回彈不全!', '#a855f7');
+        updateStatsUI();
+        return;
+      }
+
+      // 計算瞬時 BPM
+      let instantBpm = null;
+      if (state.lastPressTime > 0) {
+        const dt = now - state.lastPressTime;
+        if (dt > 0.25 && dt < 2.0) {
+          instantBpm = Math.round(60 / dt);
+          state.bpmList.push(instantBpm);
+          state.bpmHistory.push({ t: state.elapsed, bpm: instantBpm });
+          if (state.bpmHistory.length > 40) state.bpmHistory.shift();
+        }
+      }
+      state.lastPressTime = now;
+
+      // 空壓測驗模式：純紀錄 BPM，不做遊戲音符判定
+      if (state.mode === 'empty') {
+        state.stats.perfect++;
+        state.stats.combo++;
+        state.stats.maxCombo = Math.max(state.stats.maxCombo, state.stats.combo);
+        playPressClick(true);
+        if (instantBpm) {
+          const inZone = instantBpm >= 100 && instantBpm <= 120;
+          showJudgment(
+            inZone ? `${instantBpm} BPM (標準區間)` : `${instantBpm} BPM`,
+            inZone ? '#10b981' : '#38bdf8'
+          );
+        } else {
+          showJudgment('開始計頻...', '#38bdf8');
+        }
+        updateStatsUI();
+        return;
+      }
+
+      // 節奏遊戲模式：比對最接近的音符或區間
+      let bestNote = null;
+      let minDiff = Infinity;
+      for (const note of state.notes) {
+        if (!note.hit && !note.missed) {
+          const diff = Math.abs(note.targetTime - state.elapsed);
+          if (diff < minDiff) {
+            minDiff = diff;
+            bestNote = note;
+          }
+        }
+      }
+
+      if (bestNote && minDiff <= 0.22) {
+        bestNote.hit = true;
+        if (minDiff <= 0.10) {
+          state.stats.perfect++;
+          state.stats.combo++;
+          showJudgment('PERFECT! +100', '#10b981');
+        } else {
+          state.stats.good++;
+          state.stats.combo++;
+          const hint = bestNote.targetTime > state.elapsed ? 'GOOD (略快)' : 'GOOD (略慢)';
+          showJudgment(hint, '#38bdf8');
+        }
+        state.stats.maxCombo = Math.max(state.stats.maxCombo, state.stats.combo);
+        playPressClick(true);
+      } else if (state.bpmMode === 'range' && instantBpm && instantBpm >= 100 && instantBpm <= 120) {
+        state.stats.perfect++;
+        state.stats.combo++;
+        state.stats.maxCombo = Math.max(state.stats.maxCombo, state.stats.combo);
+        playPressClick(true);
+        showJudgment(`PERFECT (${instantBpm} BPM)`, '#10b981');
+      } else {
+        state.stats.miss++;
+        state.recentMisses.push({ time: state.elapsed, prevCombo: state.stats.combo });
+        state.stats.combo = 0;
+        playPressClick(false);
+        showJudgment('節奏偏差 MISS', '#ef4444');
+      }
+
+      updateStatsUI();
+    }
+
+    function triggerPressRelease() {
+      state.isPressing = false;
+    }
+
+    // 更新右側監視器數據
+    function updateStatsUI() {
+      const liveEl = document.getElementById('liveBpmVal');
+      const avgEl = document.getElementById('avgBpmVal');
+      const zoneEl = document.getElementById('zoneRatioTxt');
+      const accEl = document.getElementById('accVal');
+      const comboEl = document.getElementById('comboVal');
+      const totalEl = document.getElementById('totalCountTxt');
+
+      if (state.bpmList.length > 0) {
+        const latest = state.bpmList[state.bpmList.length - 1];
+        const sum = state.bpmList.reduce((a, b) => a + b, 0);
+        const avg = Math.round(sum / state.bpmList.length);
+        const inZoneCount = state.bpmList.filter(b => b >= 100 && b <= 120).length;
+        const zonePct = Math.round((inZoneCount / state.bpmList.length) * 100);
+
+        liveEl.textContent = latest;
+        liveEl.style.color = (latest >= 100 && latest <= 120) ? '#10b981' : '#f59e0b';
+        avgEl.textContent = avg;
+        zoneEl.textContent = `區間命中: ${zonePct}%`;
+      } else {
+        liveEl.textContent = '--';
+        avgEl.textContent = '--';
+        zoneEl.textContent = '區間命中: 0%';
+      }
+
+      const valid = state.stats.perfect + state.stats.good;
+      const total = valid + state.stats.shallow + state.stats.recoil + state.stats.miss;
+      const acc = total === 0 ? 100 : Math.round((valid / total) * 100);
+
+      accEl.textContent = `${acc}%`;
+      accEl.style.color = acc >= 80 ? '#10b981' : '#ef4444';
+      comboEl.textContent = state.stats.combo;
+      totalEl.textContent = `總按壓: ${total} 下`;
+    }
+
+    // 繪製中央畫布 (節奏軌道 或 空壓測驗折線圖)
+    const canvas = document.getElementById('stageCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function renderCanvas() {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      if (canvas.width !== rect.width || canvas.height !== rect.height) {
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+      }
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+
+      if (state.mode === 'empty') {
+        // 空壓測驗模式：繪製 100~120 BPM 黃金區間帶與即時折線圖
+        const minBpm = 70;
+        const maxBpm = 150;
+        const y120 = h - ((120 - minBpm) / (maxBpm - minBpm)) * h;
+        const y100 = h - ((100 - minBpm) / (maxBpm - minBpm)) * h;
+
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.16)';
+        ctx.fillRect(0, y120, w, y100 - y120);
+
+        ctx.strokeStyle = 'rgba(16, 185, 129, 0.5)';
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(0, y120);
+        ctx.lineTo(w, y120);
+        ctx.moveTo(0, y100);
+        ctx.lineTo(w, y100);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = '#10b981';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.fillText('120 BPM 上限', 8, y120 - 4);
+        ctx.fillText('100 BPM 下限', 8, y100 + 13);
+
+        if (state.bpmHistory.length > 1) {
+          ctx.strokeStyle = '#38bdf8';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          state.bpmHistory.forEach((pt, idx) => {
+            const x = (idx / (state.bpmHistory.length - 1)) * (w - 30) + 15;
+            const clamped = Math.min(maxBpm, Math.max(minBpm, pt.bpm));
+            const y = h - ((clamped - minBpm) / (maxBpm - minBpm)) * h;
+            if (idx === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          });
+          ctx.stroke();
+
+          state.bpmHistory.forEach((pt, idx) => {
+            const x = (idx / (state.bpmHistory.length - 1)) * (w - 30) + 15;
+            const clamped = Math.min(maxBpm, Math.max(minBpm, pt.bpm));
+            const y = h - ((clamped - minBpm) / (maxBpm - minBpm)) * h;
+            ctx.fillStyle = (pt.bpm >= 100 && pt.bpm <= 120) ? '#10b981' : '#f59e0b';
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, Math.PI * 2);
+            ctx.fill();
+          });
+        } else {
+          ctx.fillStyle = '#64748b';
+          ctx.font = '13px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('請依節奏按壓下方紅色按鈕，即時繪製 BPM 穩定度曲線', w / 2, h / 2);
+          ctx.textAlign = 'left';
+        }
+        return;
+      }
+
+      // 節奏遊戲模式：水平滾動音符軌道 (適合手機橫向與直向寬度)
+      const hitX = 56;
+      const centerY = h / 2;
+      const speed = 220; // px per second
+
+      // 軌道背景線
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(0, centerY);
+      ctx.lineTo(w, centerY);
+      ctx.stroke();
+
+      // 判定圈
+      ctx.strokeStyle = state.isPressing ? '#ef4444' : '#38bdf8';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(hitX, centerY, state.isPressing ? 20 : 24, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.15)';
+      ctx.fill();
+
+      // 繪製音符
+      for (const note of state.notes) {
+        if (note.hit) continue;
+        const dt = note.targetTime - state.elapsed;
+        const x = hitX + dt * speed;
+        if (x < -30 || x > w + 30) continue;
+
+        ctx.fillStyle = note.missed ? '#475569' : '#facc15';
+        ctx.beginPath();
+        ctx.arc(x, centerY, 14, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('按', x, centerY + 4);
+      }
+      ctx.textAlign = 'left';
+    }
+
+    // 主迴圈
+    let lastFrameTime = performance.now();
+    function gameLoop(now) {
+      const dt = Math.min(0.05, (now - lastFrameTime) / 1000);
+      lastFrameTime = now;
+
+      // LED 霹靂燈平滑升降 (壓下上升、回彈下降)
+      if (state.isPressing) {
+        const targetLvl = state.holdType === 'shallow' ? 6 : 12;
+        state.ledLevel = Math.min(targetLvl, state.ledLevel + dt * 95);
+      } else {
+        const minLvl = state.holdType === 'recoil' ? 4 : 0;
+        state.ledLevel = Math.max(minLvl, state.ledLevel - dt * 75);
+      }
+      updateHardwareVisual(state.ledLevel);
+
+      if (state.running && !state.paused) {
+        state.elapsed += dt;
+
+        if (state.duration > 0) {
+          state.timeLeft = Math.max(0, state.duration - state.elapsed);
+          document.getElementById('timerDisplay').textContent = `剩餘 ${state.timeLeft.toFixed(1)}s`;
+          if (state.timeLeft <= 0) {
+            finishSession();
+          }
+        } else {
+          document.getElementById('timerDisplay').textContent = `已進行 ${state.elapsed.toFixed(1)}s`;
+        }
+
+        // 生成節拍與音符
+        const bpm = getTargetBpm();
+        const beatInterval = 60 / bpm;
+        if (state.elapsed >= state.nextNoteTime) {
+          playBeatSound(beatStep % 4 === 0);
+          beatStep++;
+          if (state.mode === 'game') {
+            state.notes.push({
+              targetTime: state.nextNoteTime + 1.5,
+              hit: false,
+              missed: false
+            });
+          }
+          state.nextNoteTime += beatInterval;
+        }
+
+        // 檢查漏拍 MISS
+        if (state.mode === 'game') {
+          for (const note of state.notes) {
+            if (!note.hit && !note.missed && state.elapsed - note.targetTime > 0.22) {
+              note.missed = true;
+              state.stats.miss++;
+              state.recentMisses.push({ time: state.elapsed, prevCombo: state.stats.combo });
+              state.stats.combo = 0;
+              updateStatsUI();
+            }
+          }
+        }
+      }
+
+      renderCanvas();
+      requestAnimationFrame(gameLoop);
+    }
+
+    // 開始 / 重置訓練
+    function startSession() {
+      unlockAudio();
+      state.running = true;
+      state.paused = false;
+      state.elapsed = 0;
+      state.timeLeft = state.duration;
+      state.isPressing = false;
+      state.holdType = 'normal';
+      state.ledLevel = 0;
+      state.lastPressTime = 0;
+      state.bpmList = [];
+      state.bpmHistory = [];
+      state.notes = [];
+      state.nextNoteTime = 0.2;
+      beatStep = 0;
+      state.recentMisses = [];
+      state.stats = { perfect: 0, good: 0, shallow: 0, recoil: 0, miss: 0, combo: 0, maxCombo: 0 };
+
+      updateStatsUI();
+      updateHeaderTitles();
+      document.getElementById('statusTag').textContent = '訓練進行中';
+      document.getElementById('statusTag').style.color = '#10b981';
+      document.getElementById('startModal').classList.add('hidden');
+      document.getElementById('pauseModal').classList.add('hidden');
+      document.getElementById('resultModal').classList.add('hidden');
+    }
+
+    // 智慧暫停 (自動扣除前 1.25 秒因暫停手離開發生的 MISS)
+    function pauseSession() {
+      if (!state.running || state.paused) return;
+      state.paused = true;
+      state.isPressing = false;
+
+      let forgiven = 0;
+      const cutoff = state.elapsed - 1.25;
+      while (state.recentMisses.length > 0 && state.recentMisses[state.recentMisses.length - 1].time >= cutoff) {
+        const item = state.recentMisses.pop();
+        if (state.stats.miss > 0) {
+          state.stats.miss--;
+          state.stats.combo = item.prevCombo;
+          forgiven++;
+        }
+      }
+      // 豁免正要進入判定區的音符
+      state.notes = state.notes.filter(n => n.hit || n.missed || (n.targetTime - state.elapsed > 0.35));
+      updateStatsUI();
+
+      document.getElementById('pauseGraceNote').textContent = forgiven > 0
+        ? `✨ 已自動扣除暫停前 1.25 秒內因手部離開螢幕產生的 ${forgiven} 次 MISS，並恢復連擊數！`
+        : '訓練已安全暫停，可隨時繼續或直接結算目前成績。';
+
+      const avg = state.bpmList.length > 0
+        ? Math.round(state.bpmList.reduce((a, b) => a + b, 0) / state.bpmList.length) + ' BPM'
+        : '--';
+      document.getElementById('pauseAvgBpm').textContent = avg;
+      document.getElementById('pauseAcc').textContent = document.getElementById('accVal').textContent;
+      document.getElementById('pauseModal').classList.remove('hidden');
+    }
+
+    function resumeSession() {
+      unlockAudio();
+      state.paused = false;
+      document.getElementById('pauseModal').classList.add('hidden');
+    }
+
+    // 結算成績
+    function finishSession() {
+      state.running = false;
+      state.paused = false;
+      state.isPressing = false;
+      document.getElementById('pauseModal').classList.add('hidden');
+
+      const valid = state.stats.perfect + state.stats.good;
+      const total = valid + state.stats.shallow + state.stats.recoil + state.stats.miss;
+      const acc = total === 0 ? 0 : Math.round((valid / total) * 100);
+
+      let avgBpmText = '--';
+      let zonePct = 0;
+      if (state.bpmList.length > 0) {
+        const avg = Math.round(state.bpmList.reduce((a, b) => a + b, 0) / state.bpmList.length);
+        avgBpmText = `${avg} BPM`;
+        const inZone = state.bpmList.filter(b => b >= 100 && b <= 120).length;
+        zonePct = Math.round((inZone / state.bpmList.length) * 100);
+      }
+
+      const headline = document.getElementById('resultHeadline');
+      const subtext = document.getElementById('resultSubtext');
+      if (state.mode === 'empty') {
+        headline.textContent = '🩺 空壓節奏測驗完成';
+        headline.style.color = '#38bdf8';
+        subtext.textContent = `你的實測平均節奏為 ${avgBpmText}，共有 ${zonePct}% 落在 100~120 BPM 黃金區間。`;
+      } else if (acc >= 80 && total >= 5) {
+        headline.textContent = '🎉 急救成功！(達 80% 門檻)';
+        headline.style.color = '#10b981';
+        subtext.textContent = '按壓深度與 100~120 BPM 節奏控制精準，成功維持患者腦部血流！';
+      } else {
+        headline.textContent = '⚠️ 急救未達標，請繼續練習';
+        headline.style.color = '#f59e0b';
+        subtext.textContent = '有效按壓準確率需達 80% 以上，請留意節奏穩定度與完全回彈。';
+      }
+
+      document.getElementById('resAvgBpm').textContent = avgBpmText;
+      document.getElementById('resZonePct').textContent = `${zonePct}%`;
+      document.getElementById('resAcc').textContent = `${acc}%`;
+      document.getElementById('resComboTotal').textContent = `${state.stats.maxCombo} / ${total} 下`;
+      document.getElementById('resPG').textContent = `${state.stats.perfect} / ${state.stats.good}`;
+      document.getElementById('resErrors').textContent = `${state.stats.shallow} / ${state.stats.recoil} / ${state.stats.miss}`;
+      document.getElementById('resultModal').classList.remove('hidden');
+    }
+
+    function updateHeaderTitles() {
+      const titleEl = document.getElementById('centerTitle');
+      if (state.mode === 'empty') {
+        titleEl.textContent = '🩺 空壓測驗模式 (純紀錄即時 BPM 與穩定度)';
+      } else {
+        const bpmLabel = state.bpmMode === 'range' ? '100~120 BPM 動態區間' : `${state.bpmMode} BPM`;
+        titleEl.textContent = `🎵 節拍判定軌道 (目標: ${bpmLabel})`;
+      }
+    }
+
+    // 綁定頂部切換按鈕
+    document.querySelectorAll('#modeGroup .pill-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#modeGroup .pill-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.mode = btn.dataset.mode;
+        updateHeaderTitles();
+        if (state.running) startSession();
+      });
+    });
+
+    document.querySelectorAll('#timeGroup .pill-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#timeGroup .pill-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.duration = parseInt(btn.dataset.sec, 10);
+        if (state.running) startSession();
+      });
+    });
+
+    document.querySelectorAll('#bpmGroup .pill-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#bpmGroup .pill-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.bpmMode = btn.dataset.bpm;
+        updateHeaderTitles();
+      });
+    });
+
+    // 全螢幕切換 (相容行動裝置與桌面瀏覽器)
+    document.getElementById('btnFullscreen').addEventListener('click', () => {
+      const docEl = document.documentElement;
+      if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+        if (docEl.requestFullscreen) docEl.requestFullscreen().catch(() => {});
+        else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      }
+    });
+
+    // 視窗按鈕綁定
+    document.getElementById('btnStartGame').addEventListener('click', startSession);
+    document.getElementById('btnPause').addEventListener('click', pauseSession);
+    document.getElementById('btnResume').addEventListener('click', resumeSession);
+    document.getElementById('btnFinishNow').addEventListener('click', finishSession);
+    document.getElementById('btnRestartFromPause').addEventListener('click', startSession);
+    document.getElementById('btnPlayAgain').addEventListener('click', startSession);
+
+    // 行動端 Pointer 事件綁定 (支援多點防呆與按住/放開連續物理行程)
+    function bindActionButton(id, type) {
+      const btn = document.getElementById(id);
+      btn.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        btn.classList.add('pressed');
+        triggerPressDown(type);
+      });
+      const endHandler = (e) => {
+        e.preventDefault();
+        btn.classList.remove('pressed');
+        triggerPressRelease();
+      };
+      btn.addEventListener('pointerup', endHandler);
+      btn.addEventListener('pointercancel', endHandler);
+      btn.addEventListener('pointerleave', endHandler);
+    }
+
+    bindActionButton('touchPress', 'normal');
+    bindActionButton('touchShallow', 'shallow');
+    bindActionButton('touchRecoil', 'recoil');
+
+    // 相容外接藍牙鍵盤操作
+    window.addEventListener('keydown', (e) => {
+      if (e.repeat) return;
+      if (e.code === 'Space') { e.preventDefault(); triggerPressDown('normal'); }
+      else if (e.key === 's' || e.key === 'S') triggerPressDown('shallow');
+      else if (e.key === 'e' || e.key === 'E') triggerPressDown('recoil');
+      else if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
+        if (state.paused) resumeSession();
+        else pauseSession();
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'Space' || e.key === 's' || e.key === 'S' || e.key === 'e' || e.key === 'E') {
+        triggerPressRelease();
+      }
+    });
+
+    // 啟動繪圖迴圈
+    requestAnimationFrame(gameLoop);
+  </script>
+</body>
+</html>
