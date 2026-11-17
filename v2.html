@@ -679,7 +679,7 @@
   <div class="modal-overlay" id="startModal">
     <div class="modal-card">
       <div class="start-avatar-box">
-        <img src="nurse_fail.gif" alt="護理師" id="startNurseImg" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='90' height='90'><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='%2338bdf8' font-size='44'>🫀</text></svg>'" />
+        <img src="nurse_start.gif" alt="護理師" id="startNurseImg" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='90' height='90'><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='%2338bdf8' font-size='44'>🫀</text></svg>'" />
       </div>
       <div class="modal-title">🫀 CPR 節奏訓練系統 v2</div>
       <p class="modal-desc">
@@ -1244,7 +1244,7 @@
 
       if (state.mode === 'empty') {
         subtext.textContent = `實測平均節奏為 ${avgBpmText}，${zonePct}% 落在 100~120 BPM 黃金區間。`;
-        resultNurseImg.src = 'nurse_fail.gif';
+        resultNurseImg.src = 'nurse_start.gif';
       } else if (isSuccess) {
         subtext.textContent = `準確率達 ${acc}%！按壓深度與 100~120 BPM 節奏極為精準，成功挽救患者生命！`;
         resultNurseImg.src = 'nurse_success.gif';
