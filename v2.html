@@ -423,23 +423,69 @@
       text-align: center;
       box-shadow: 0 20px 40px rgba(0,0,0,0.6);
       position: relative;
+      overflow: visible;
     }
 
+    /* 去邊框、放大顯示並直接跳出的護理師動畫容器 */
     .result-avatar-box {
-      width: 90px;
-      height: 90px;
-      margin: 0 auto 10px;
-      border-radius: 50%;
-      overflow: hidden;
-      border: 3px solid var(--accent-blue);
-      box-shadow: 0 4px 16px rgba(56, 189, 248, 0.35);
-      background: #1e293b;
+      width: 220px;
+      height: 185px;
+      margin: -24px auto 6px;
+      border-radius: 0;
+      overflow: visible;
+      border: none;
+      box-shadow: none;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .result-avatar-box img {
       width: 100%;
       height: 100%;
-      object-fit: cover;
+      object-fit: contain;
+      filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.55));
+    }
+
+    .start-avatar-box {
+      width: 150px;
+      height: 130px;
+      margin: -10px auto 6px;
+      background: transparent;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .start-avatar-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45));
+    }
+
+    @keyframes nursePopOut {
+      0% {
+        opacity: 0;
+        transform: translateY(38px) scale(0.6);
+      }
+      65% {
+        opacity: 1;
+        transform: translateY(-10px) scale(1.07);
+      }
+      85% {
+        transform: translateY(3px) scale(0.98);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .nurse-pop {
+      animation: nursePopOut 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
     }
 
     .modal-title {
@@ -450,10 +496,10 @@
     }
 
     .modal-desc {
-      font-size: 12px;
+      font-size: 12.5px;
       color: var(--text-muted);
-      line-height: 1.45;
-      margin-bottom: 12px;
+      line-height: 1.5;
+      margin-bottom: 14px;
     }
 
     .summary-grid {
@@ -632,13 +678,13 @@
 
   <div class="modal-overlay" id="startModal">
     <div class="modal-card">
-      <div class="result-avatar-box">
-        <img src="nurse_fail.gif" alt="護理師" id="startNurseImg" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='90' height='90'><rect fill='%231e293b' width='90' height='90'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='%2338bdf8' font-size='32'>🫀</text></svg>'" />
+      <div class="start-avatar-box">
+        <img src="nurse_fail.gif" alt="護理師" id="startNurseImg" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='90' height='90'><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='%2338bdf8' font-size='44'>🫀</text></svg>'" />
       </div>
       <div class="modal-title">🫀 CPR 節奏訓練系統 v2</div>
       <p class="modal-desc">
         請保持橫向操作。按住紅色按鈕模擬下壓 5~6cm，放開手指模擬完全回彈。<br/>
-        達成 80% 以上準確率即可解鎖**「救援成功」**，否則將觸發**「救援失敗」**護理師動畫！
+        達成 80% 以上準確率即可解鎖<strong>「救援成功」</strong>，否則將觸發<strong>「救援失敗」</strong>護理師動畫！
       </p>
       <div class="modal-actions">
         <button class="modal-btn modal-btn-primary" id="btnStartGame">▶️ 開始訓練 (解鎖音效)</button>
@@ -664,13 +710,12 @@
     </div>
   </div>
 
-  <!-- 最終結算視窗（具備 救援成功 / 救援失敗 雙結局動態切換） -->
+  <!-- 最終結算視窗：已移除邊框與綠色/紅色標題文字，改由放大的護理師動畫直接跳出取代 -->
   <div class="modal-overlay hidden" id="resultModal">
     <div class="modal-card" id="resultCardStyle">
       <div class="result-avatar-box" id="resultAvatarBorder">
-        <img id="resultNurseImg" src="nurse_fail.gif" alt="護理師表情" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='90' height='90'><rect fill='%231e293b' width='90' height='90'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='%23ef4444' font-size='32'>👩‍⚕️</text></svg>'" />
+        <img id="resultNurseImg" src="nurse_fail.gif" alt="護理師結算動畫" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='%23ef4444' font-size='52'>👩‍⚕️</text></svg>'" />
       </div>
-      <div class="modal-title" id="resultHeadline">🎉 救援成功！</div>
       <p class="modal-desc" id="resultSubtext">按壓深度與 100~120 BPM 節奏表現優異，成功維持腦部灌流！</p>
       <div class="summary-grid">
         <div class="summary-item">你的實測平均 BPM<strong id="resAvgBpm">--</strong></div>
@@ -1172,7 +1217,7 @@
       document.getElementById('pauseModal').classList.add('hidden');
     }
 
-    // 💡 雙結局結算函數：動態切換 救援成功 / 救援失敗 UI 與護理師表情
+    // 雙結局結算函數：直接跳出無邊框放大的護理師動畫取代原本的文字標題
     function finishSession() {
       state.running = false;
       state.paused = false;
@@ -1192,34 +1237,26 @@
         zonePct = Math.round((inZone / state.bpmList.length) * 100);
       }
 
-      const headline = document.getElementById('resultHeadline');
       const subtext = document.getElementById('resultSubtext');
       const resultNurseImg = document.getElementById('resultNurseImg');
-      const avatarBorder = document.getElementById('resultAvatarBorder');
 
       const isSuccess = (state.mode === 'game' && acc >= 80 && total >= 5);
 
       if (state.mode === 'empty') {
-        headline.textContent = '🩺 空壓節奏測驗完成';
-        headline.style.color = '#38bdf8';
         subtext.textContent = `實測平均節奏為 ${avgBpmText}，${zonePct}% 落在 100~120 BPM 黃金區間。`;
         resultNurseImg.src = 'nurse_fail.gif';
-        avatarBorder.style.borderColor = '#38bdf8';
       } else if (isSuccess) {
-        // 🌟 救援成功狀態
-        headline.textContent = '🎉 救援成功！生命徵象恢復';
-        headline.style.color = '#10b981';
         subtext.textContent = `準確率達 ${acc}%！按壓深度與 100~120 BPM 節奏極為精準，成功挽救患者生命！`;
-        resultNurseImg.src = 'nurse_success.gif'; // 若有成功笑臉 GIF 可放這，預設自動相容
-        avatarBorder.style.borderColor = '#10b981';
+        resultNurseImg.src = 'nurse_success.gif';
       } else {
-        // ⚠️ 救援失敗狀態
-        headline.textContent = '❌ 救援失敗 / 未達標';
-        headline.style.color = '#ef4444';
-        subtext.textContent = `準確率 ${acc}%（低於 80% 門檻）或節奏偏差。護理師搖頭表示需要重新加強訓練！`;
-        resultNurseImg.src = 'nurse_fail.gif'; // 套用你上傳的救援失敗護理師動態 GIF
-        avatarBorder.style.borderColor = '#ef4444';
+        subtext.textContent = `準確率 ${acc}%（低於 80% 門檻）或節奏偏差，需要重新加強訓練！`;
+        resultNurseImg.src = 'nurse_fail.gif';
       }
+
+      // 重新觸發護理師跳出動畫
+      resultNurseImg.classList.remove('nurse-pop');
+      void resultNurseImg.offsetWidth;
+      resultNurseImg.classList.add('nurse-pop');
 
       document.getElementById('resAvgBpm').textContent = avgBpmText;
       document.getElementById('resZonePct').textContent = `${zonePct}%`;
