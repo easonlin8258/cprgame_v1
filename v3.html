@@ -2416,25 +2416,90 @@
     }
     ['startNurseImg', 'arcadeNurseImg', 'resultNurseImg'].forEach(id => attachFallback(id, 'nurse'));
 
-    // Global Easter Egg: clicking nurse_start.gif on ANY screen switches to bonus1.gif (click again to toggle back)
+    // Global Easter Egg: clicking nurse_start.gif on ANY screen plays Bonus1.gif ONCE and switches back automatically
+    const BONUS1_FALLBACK_MS = 1200; // 若為本機 file:// 開啟或單影格圖片時的預設播放秒數（毫秒）
+    let bonus1DurationMs = BONUS1_FALLBACK_MS;
+
+    function clearBonusTimer(img) {
+      if (img && img._bonusTimer) {
+        clearTimeout(img._bonusTimer);
+        img._bonusTimer = null;
+      }
+      if (img) delete img.dataset.bonusActive;
+    }
+
+    // 自動解析 Bonus1.gif 的實際單輪動畫總長度（毫秒）
+    (async function detectBonus1GifDuration() {
+      try {
+        const res = await fetch(ASSET_PATHS.bonus1);
+        if (!res.ok) return;
+        const bytes = new Uint8Array(await res.arrayBuffer());
+        if (bytes.length < 13 || bytes[0] !== 0x47 || bytes[1] !== 0x49 || bytes[2] !== 0x46) return;
+        let p = 13;
+        const packed = bytes[10];
+        if (packed & 0x80) p += 3 * (1 << ((packed & 7) + 1));
+        let totalMs = 0;
+        let frames = 0;
+        const n = bytes.length;
+        while (p < n) {
+          const block = bytes[p];
+          if (block === 0x3B) {
+            break;
+          } else if (block === 0x21) {
+            if (p + 2 >= n) break;
+            const label = bytes[p + 1];
+            p += 2;
+            if (label === 0xF9 && p + 5 < n && bytes[p] === 4) {
+              const delayCs = bytes[p + 2] | (bytes[p + 3] << 8);
+              totalMs += delayCs <= 1 ? 100 : delayCs * 10;
+              frames++;
+            }
+            while (p < n && bytes[p] !== 0) p += bytes[p] + 1;
+            p++;
+          } else if (block === 0x2C) {
+            if (p + 10 >= n) break;
+            const imgPacked = bytes[p + 9];
+            p += 10;
+            if (imgPacked & 0x80) p += 3 * (1 << ((imgPacked & 7) + 1));
+            p++; // LZW min code size
+            while (p < n && bytes[p] !== 0) p += bytes[p] + 1;
+            p++;
+          } else {
+            break;
+          }
+        }
+        if (frames > 1 && totalMs > 0) {
+          bonus1DurationMs = totalMs;
+        }
+      } catch (_) {
+        // file:// 環境下會自動沿用 BONUS1_FALLBACK_MS
+      }
+    })();
+
     document.addEventListener('click', (e) => {
       const img = e.target && e.target.closest ? e.target.closest('img') : null;
       if (!img || img.classList.contains('studio-thumb-char')) return;
+      if (img.dataset.bonusActive === '1') return; // 播放中不重複中斷
       const rawSrc = (img.getAttribute('src') || '') + ' ' + (img.src || '');
-      if (img.dataset.bonusActive === '1' || rawSrc.toLowerCase().includes('bonus1.gif')) {
-        delete img.dataset.fallbackApplied;
-        delete img.dataset.bonusActive;
-        img.src = ASSET_PATHS.nurse_start;
-      } else if (rawSrc.toLowerCase().includes('nurse_start.gif')) {
+      if (rawSrc.toLowerCase().includes('nurse_start.gif')) {
+        clearBonusTimer(img);
         delete img.dataset.fallbackApplied;
         img.dataset.bonusActive = '1';
-        img.src = ASSET_PATHS.bonus1;
+        const sep = ASSET_PATHS.bonus1.includes('?') ? '&' : '?';
+        img.src = ASSET_PATHS.bonus1 + sep + 'play=' + Date.now();
         if (img.id === 'arcadeNurseImg') {
           img.classList.remove('cheer-bounce');
           void img.offsetWidth;
           img.classList.add('cheer-bounce');
           setTimeout(() => img.classList.remove('cheer-bounce'), 180);
         }
+        img._bonusTimer = setTimeout(() => {
+          if (img.dataset.bonusActive === '1') {
+            clearBonusTimer(img);
+            delete img.dataset.fallbackApplied;
+            img.src = ASSET_PATHS.nurse_start;
+          }
+        }, bonus1DurationMs);
       }
     });
     ['startHeartImg', 'heartCoreImg'].forEach(id => attachFallback(id, 'heart'));
@@ -3534,8 +3599,8 @@
 
     function applyMode2Character(url, label) {
       const img = document.getElementById('arcadeNurseImg');
+      clearBonusTimer(img);
       delete img.dataset.fallbackApplied;
-      delete img.dataset.bonusActive;
       img.src = url;
       document.getElementById('studioCharLabel').textContent = `目前：${label}`;
     }
@@ -3717,7 +3782,7 @@
 
       const subtext = document.getElementById('resultSubtext');
       const resultNurseImg = document.getElementById('resultNurseImg');
-      delete resultNurseImg.dataset.bonusActive;
+      clearBonusTimer(resultNurseImg);
       const isSuccess = (state.mode === 'game' && finalAcc >= 80 && total >= 5);
 
       if (state.mode === 'empty') {
