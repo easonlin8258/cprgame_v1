@@ -403,6 +403,11 @@
         <span id="chat-unread-dot" class="hidden absolute -top-1 -right-1 w-3 h-3 rounded-full bg-rose-500 border-2 border-slate-900"></span>
       </button>
 
+      <!-- Score / Leaderboard Button -->
+      <button id="btn-scores" type="button" class="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/35 border border-amber-400/40 text-sm font-bold text-amber-200 transition flex items-center gap-1" title="查看累積積分榜">
+        <span>🏆</span><span class="hidden lg:inline">積分</span>
+      </button>
+
       <!-- Rules Button -->
       <button id="btn-rules" type="button" class="px-3 py-1.5 rounded-xl bg-white/12 hover:bg-white/22 text-sm font-bold text-white transition flex items-center gap-1">
         <span>📖</span><span class="hidden lg:inline">規則</span>
@@ -576,6 +581,7 @@
                 <div class="flex items-center gap-2">
                   <span class="text-xs font-bold text-emerald-300 uppercase tracking-wider">跨網聯機房間</span>
                   <span id="lobby-member-count" class="px-2.5 py-0.5 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-200 text-xs font-extrabold">1 / 6 人</span>
+                  <span id="lobby-deck-badge" class="px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 text-xs font-extrabold">🃏 106 張牌組</span>
                   <span id="lobby-net-status" class="px-2.5 py-0.5 rounded-full bg-sky-500/20 border border-sky-400/40 text-sky-200 text-xs font-bold">☁️ 雲端連線中...</span>
                 </div>
                 <div class="flex items-center gap-2.5 mt-1">
@@ -584,10 +590,13 @@
                 </div>
               </div>
               <div class="flex items-center gap-2 flex-wrap">
-                <button id="btn-add-one-bot" type="button" class="px-3 py-2 rounded-xl bg-indigo-600/80 hover:bg-indigo-500 text-white font-bold text-sm transition shadow">
-                  ＋ 加 1 位 AI
+                <button id="btn-add-one-bot" type="button" class="px-3 py-2 rounded-xl bg-indigo-600/85 hover:bg-indigo-500 text-white font-bold text-sm transition shadow">
+                  ＋ 加 AI
                 </button>
-                <button id="btn-fill-bots" type="button" class="px-3.5 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-sm transition shadow">
+                <button id="btn-remove-one-bot" type="button" class="px-3 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-100 font-bold text-sm transition shadow">
+                  － 移 AI
+                </button>
+                <button id="btn-fill-bots" type="button" class="px-3 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-sm transition shadow">
                   🤖 補滿 6 人
                 </button>
                 <button id="btn-leave-room" type="button" class="px-3 py-2 rounded-xl bg-rose-600/80 hover:bg-rose-500 text-white font-bold text-sm transition">
@@ -641,6 +650,14 @@
             <button type="button" data-preset="1h5a" class="preset-btn px-3 py-1.5 rounded-full text-sm font-bold bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-400/40 text-emerald-100 transition">6 人大戰（1人+5AI）</button>
             <button type="button" data-preset="2h" class="preset-btn px-3 py-1.5 rounded-full text-sm font-bold bg-amber-600/30 hover:bg-amber-600/50 border border-amber-400/40 text-amber-100 transition">2 人同機</button>
             <button type="button" data-preset="6h" class="preset-btn px-3 py-1.5 rounded-full text-sm font-bold bg-purple-600/30 hover:bg-purple-600/50 border border-purple-400/40 text-purple-100 transition">6 人同機</button>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-emerald-950/50 border border-emerald-400/30 text-sm">
+            <span id="local-deck-info" class="font-bold text-emerald-200">🃏 目前 4 人對局：自動使用 106 張經典牌組（2 副 + 2 鬼牌）</span>
+            <div class="flex items-center gap-1.5">
+              <button id="btn-local-add-ai" type="button" class="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition">＋ 增加 AI</button>
+              <button id="btn-local-remove-ai" type="button" class="px-2.5 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-100 font-bold text-xs transition">－ 移除 AI</button>
+            </div>
           </div>
 
           <!-- 6 Player Seats Grid -->
@@ -774,6 +791,24 @@
       </div>
       <div class="px-6 py-3.5 bg-slate-950/70 border-t border-white/10 text-right">
         <button id="btn-ok-rules" type="button" class="px-6 py-2 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black text-sm">了解了</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cumulative Leaderboard Modal -->
+  <div id="modal-scores" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3">
+    <div class="bg-slate-900 border border-amber-400/40 rounded-3xl max-w-lg w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="px-6 py-4 bg-gradient-to-r from-amber-500/20 to-slate-900 border-b border-white/10 flex items-center justify-between">
+        <div>
+          <h2 class="text-lg sm:text-xl font-black text-amber-300">🏆 累積積分排行榜</h2>
+          <p id="scores-round-count" class="text-xs text-slate-300 mt-0.5">已完成 0 局對戰</p>
+        </div>
+        <button id="btn-close-scores" type="button" class="text-slate-400 hover:text-white text-2xl leading-none px-1">&times;</button>
+      </div>
+      <div id="leaderboard-body" class="p-5 overflow-y-auto space-y-2.5"></div>
+      <div class="px-6 py-3.5 bg-slate-950/80 border-t border-white/10 flex items-center justify-between">
+        <button id="btn-reset-scores" type="button" class="px-4 py-2 rounded-xl bg-rose-600/80 hover:bg-rose-500 text-white font-bold text-xs sm:text-sm transition">🗑 重置累積積分</button>
+        <button id="btn-ok-scores" type="button" class="px-5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-sm transition">關閉</button>
       </div>
     </div>
   </div>
@@ -963,8 +998,11 @@
         waitingPass: false,
         logs: [],
         nextSetUid: 1,
+        scoreBook: {}, // { playerName: totalPoints }
+        roundsPlayed: 0,
         timerRemaining: 90,
         timerHandle: null,
+        hostTimeoutGraceHandle: null,
         aiTimeoutHandle: null
       };
 
@@ -1419,6 +1457,29 @@
         sendNetMessage({ type: 'LOBBY_SYNC', seats: net.seats, roomEvents: net.roomEvents });
       }
 
+      function removeAISeatAt(idx) {
+        if (!net.isHost) return;
+        const seat = net.seats[idx];
+        if (!seat || !seat.occupied || !seat.isAI) return;
+        const removedName = seat.name;
+        net.seats[idx] = { occupied: false, isAI: false, clientId: null, name: '', avatar: SEAT_AVATARS[idx] };
+        addRoomEvent(`➖ 房主移除了 AI：${removedName}（座位 #${idx + 1}）`, 'info');
+        playSound('draw');
+        renderOnlineLobby();
+        sendNetMessage({ type: 'LOBBY_SYNC', seats: net.seats, roomEvents: net.roomEvents });
+      }
+
+      function removeOneAISeat() {
+        if (!net.isHost) return;
+        for (let i = net.seats.length - 1; i >= 0; i--) {
+          if (net.seats[i].occupied && net.seats[i].isAI) {
+            removeAISeatAt(i);
+            return;
+          }
+        }
+        showToast('目前房間內沒有 AI 座位可移除', 'info');
+      }
+
       function fillEmptySeatsWithAI() {
         if (!net.isHost) return;
         const addedNames = [];
@@ -1564,7 +1625,9 @@
           jp: Array.from(state.justPlayedIds),
           jd: state.justDrawnId,
           lg: state.logs.slice(0, 6),
-          nu: state.nextSetUid
+          nu: state.nextSetUid,
+          sb: state.scoreBook,
+          rp: state.roundsPlayed
         };
       }
 
@@ -1596,6 +1659,8 @@
           state.justDrawnId = data.jd || null;
           state.logs = data.lg || [];
           state.nextSetUid = data.nu || 1;
+          if (data.sb) state.scoreBook = data.sb;
+          if (typeof data.rp === 'number') state.roundsPlayed = data.rp;
         } else {
           if (data.setupConfig) setupConfig = data.setupConfig;
           state.started = data.started;
@@ -1669,7 +1734,11 @@
 
         const occupiedCount = net.seats.filter(s => s.occupied).length;
         const humanCount = net.seats.filter(s => s.occupied && !s.isAI).length;
-        document.getElementById('lobby-member-count').textContent = `${occupiedCount} / 6 人（真人 ${humanCount} 位）`;
+        const aiCount = net.seats.filter(s => s.occupied && s.isAI).length;
+        document.getElementById('lobby-member-count').textContent = `${occupiedCount} / 6 人（真人 ${humanCount} · AI ${aiCount}）`;
+        const deckSize = occupiedCount >= 5 ? 160 : 106;
+        const deckDetail = occupiedCount >= 5 ? '3 副 + 4 鬼牌' : '2 副 + 2 鬼牌';
+        document.getElementById('lobby-deck-badge').textContent = `🃏 ${deckSize} 張牌組（${deckDetail}）`;
 
         // Connection status banner for joining guests
         const connBanner = document.getElementById('online-connect-banner');
@@ -1719,9 +1788,14 @@
                   <div class="mt-1">${badge}</div>
                 </div>
               </div>
+              ${net.isHost && s.occupied && s.isAI ? `<button type="button" data-remove-ai="${idx}" class="px-2 py-1 rounded-lg bg-rose-600/75 hover:bg-rose-500 text-white text-xs font-bold shrink-0 transition" title="移除此 AI">✕</button>` : ''}
             </div>
           `;
         }).join('');
+
+        grid.querySelectorAll('[data-remove-ai]').forEach(btn => {
+          btn.addEventListener('click', () => removeAISeatAt(Number(btn.dataset.removeAi)));
+        });
 
         // Render live join/leave activity feed
         const feed = document.getElementById('online-activity-feed');
@@ -1736,6 +1810,7 @@
 
         updateNetStatusPill();
         document.getElementById('btn-add-one-bot').classList.toggle('hidden', !net.isHost);
+        document.getElementById('btn-remove-one-bot').classList.toggle('hidden', !net.isHost || aiCount === 0);
         document.getElementById('btn-fill-bots').classList.toggle('hidden', !net.isHost);
         const startBtn = document.getElementById('btn-online-start');
         startBtn.classList.toggle('hidden', !net.isHost);
@@ -2151,9 +2226,11 @@
         state.players = activeCfg.map((cfg, idx) => {
           const hand = deck.splice(0, 14);
           sortHandTiles(hand, 'smart');
+          const pName = cfg.name.trim() || `玩家 ${idx + 1}`;
+          if (typeof state.scoreBook[pName] !== 'number') state.scoreBook[pName] = 0;
           return {
             id: idx,
-            name: cfg.name.trim() || `玩家 ${idx + 1}`,
+            name: pName,
             isAI: cfg.isAI,
             clientId: cfg.clientId || null,
             avatar: cfg.avatar,
@@ -2176,6 +2253,7 @@
 
       function clearTimers() {
         if (state.timerHandle) { clearInterval(state.timerHandle); state.timerHandle = null; }
+        if (state.hostTimeoutGraceHandle) { clearTimeout(state.hostTimeoutGraceHandle); state.hostTimeoutGraceHandle = null; }
         if (state.aiTimeoutHandle) { clearTimeout(state.aiTimeoutHandle); state.aiTimeoutHandle = null; }
       }
 
@@ -2240,9 +2318,20 @@
           if (state.timerRemaining <= 0) {
             clearInterval(state.timerHandle);
             state.timerHandle = null;
+            const curP = state.players[state.currentPlayerIndex];
             if (isMyLocalTurn()) {
-              showToast('⏰ 回合超時！已自動還原桌面並抽一張牌', 'error');
+              playSound('error');
+              showToast('⏰ 時間到！已自動抽一張牌並跳下一位', 'error');
               handleDrawAction(true);
+            } else if (net.mode === 'online' && net.isHost && curP && !curP.isAI) {
+              // Grace period for remote player; if still stuck, Host auto-draws and advances!
+              const expectedTurn = state.turnNumber;
+              const expectedIdx = state.currentPlayerIndex;
+              state.hostTimeoutGraceHandle = setTimeout(() => {
+                if (!state.gameOver && state.turnNumber === expectedTurn && state.currentPlayerIndex === expectedIdx) {
+                  forceTimeoutDrawForCurrentPlayer();
+                }
+              }, 2200);
             }
           }
         }, 1000);
@@ -2331,6 +2420,32 @@
         playSound('draw');
         showToast('已還原至本回合初始狀態', 'info');
         renderAll();
+      }
+
+      function forceTimeoutDrawForCurrentPlayer() {
+        const player = state.players[state.currentPlayerIndex];
+        if (!player || state.gameOver) return;
+        state.selected = [];
+        state.hintTileIds.clear();
+        state.justPlayedIds.clear();
+        if (state.pool.length > 0) {
+          const drawn = state.pool.pop();
+          player.hand.push(drawn);
+          sortHandTiles(player.hand, player.sortMode);
+          state.consecutivePasses = 0;
+          playSound('draw');
+          addLog(`⏰ ${player.name} 時間到，系統自動抽一張牌並換下一位。`, 'draw');
+          showToast(`⏰ ${player.name} 時間到，已自動抽牌並換下一位`, 'info');
+        } else {
+          state.consecutivePasses++;
+          addLog(`⏰ ${player.name} 時間到（牌池已空），跳過回合。`, 'draw');
+          if (state.consecutivePasses >= state.players.length) {
+            finishGameByLowestScore();
+            broadcastGameState();
+            return;
+          }
+        }
+        advanceTurn();
       }
 
       function handleDrawAction(isTimeout = false) {
@@ -2499,8 +2614,11 @@
           return { player: p, penalty };
         });
 
+        state.roundsPlayed++;
         rows.forEach(r => {
           r.finalScore = r.player.id === winner.id ? totalPenalty : -r.penalty;
+          state.scoreBook[r.player.name] = (state.scoreBook[r.player.name] || 0) + r.finalScore;
+          r.totalScore = state.scoreBook[r.player.name];
         });
         rows.sort((a, b) => b.finalScore - a.finalScore);
 
@@ -2520,8 +2638,13 @@
                 <div class="text-xs text-slate-400">剩餘 ${r.player.hand.length} 張牌（點數 ${r.penalty}）</div>
               </div>
             </div>
-            <div class="font-black text-xl tabular-nums ${r.finalScore >= 0 ? 'text-emerald-400' : 'text-rose-400'}">
-              ${r.finalScore > 0 ? '+' : ''}${r.finalScore}
+            <div class="text-right">
+              <div class="font-black text-xl tabular-nums ${r.finalScore >= 0 ? 'text-emerald-400' : 'text-rose-400'}">
+                本局 ${r.finalScore > 0 ? '+' : ''}${r.finalScore}
+              </div>
+              <div class="text-xs font-bold text-amber-300 tabular-nums">
+                🏆 累積 ${r.totalScore > 0 ? '+' : ''}${r.totalScore}
+              </div>
             </div>
           </div>
         `).join('');
@@ -2999,8 +3122,9 @@
                   <span class="text-sm font-extrabold truncate ${active ? 'text-amber-200' : 'text-white'}">${escapeHtml(p.name)}${isMe ? ' (你)' : ''}</span>
                   ${p.isAI ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/30 text-indigo-200 font-bold shrink-0">AI</span>' : (net.mode === 'online' ? '<span class="w-2 h-2 rounded-full bg-emerald-400 shrink-0" title="線上玩家"></span>' : '')}
                 </div>
-                <div class="text-xs font-semibold ${p.hasIcebroken ? 'text-emerald-300' : 'text-sky-300'}">
-                  ${p.hasIcebroken ? '🔥 已破冰' : '❄️ 未破冰'}
+                <div class="flex items-center gap-1.5 text-xs font-semibold flex-wrap">
+                  <span class="${p.hasIcebroken ? 'text-emerald-300' : 'text-sky-300'}">${p.hasIcebroken ? '🔥 已破冰' : '❄️ 未破冰'}</span>
+                  <span class="text-amber-300 font-bold tabular-nums">🏆 ${(state.scoreBook[p.name] || 0) > 0 ? '+' : ''}${state.scoreBook[p.name] || 0}</span>
                 </div>
               </div>
             </div>
@@ -3266,6 +3390,12 @@
         const activeCnt = setupConfig.players.filter(p => p.enabled !== false).length;
         const startLocalBtn = document.getElementById('btn-start-game');
         if (startLocalBtn) startLocalBtn.textContent = `🎮 開始 ${activeCnt} 人拉米！`;
+        const localDeckEl = document.getElementById('local-deck-info');
+        if (localDeckEl) {
+          const totalCards = activeCnt >= 5 ? 160 : 106;
+          const desc = activeCnt >= 5 ? '3 副四色 1–13 + 4 鬼牌' : '2 副四色 1–13 + 2 鬼牌';
+          localDeckEl.textContent = `🃏 目前 ${activeCnt} 人對局：自動使用 ${totalCards} 張牌組（${desc}）`;
+        }
 
         container.querySelectorAll('[data-seat-name]').forEach(inp => {
           inp.addEventListener('input', (e) => {
@@ -3531,7 +3661,74 @@
         document.getElementById('btn-copy-room-code').addEventListener('click', () => {
           if (net.roomCode) copyTextSafe(net.roomCode, `已複製房號 ${net.roomCode}`);
         });
+        function renderLeaderboardModal() {
+          document.getElementById('scores-round-count').textContent = `已完成 ${state.roundsPlayed} 局對戰`;
+          const entries = Object.entries(state.scoreBook);
+          const body = document.getElementById('leaderboard-body');
+          if (entries.length === 0) {
+            body.innerHTML = '<div class="text-center text-sm text-slate-400 py-6">尚無積分紀錄，完成一局後即會自動累計積分！</div>';
+            return;
+          }
+          entries.sort((a, b) => b[1] - a[1]);
+          body.innerHTML = entries.map(([name, pts], idx) => `
+            <div class="flex items-center justify-between px-4 py-3 rounded-2xl ${idx === 0 ? 'bg-amber-500/20 border border-amber-400/50' : 'bg-white/5 border border-white/10'}">
+              <div class="flex items-center gap-3">
+                <span class="w-7 text-center font-black text-base ${idx === 0 ? 'text-amber-300' : 'text-slate-400'}">#${idx + 1}</span>
+                <span class="font-bold text-base text-white">${escapeHtml(name)}</span>
+              </div>
+              <span class="font-black text-xl tabular-nums ${pts >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${pts > 0 ? '+' : ''}${pts} 分</span>
+            </div>
+          `).join('');
+        }
+
+        document.getElementById('btn-scores').addEventListener('click', () => {
+          renderLeaderboardModal();
+          document.getElementById('modal-scores').classList.remove('hidden');
+        });
+        document.getElementById('btn-close-scores').addEventListener('click', () => document.getElementById('modal-scores').classList.add('hidden'));
+        document.getElementById('btn-ok-scores').addEventListener('click', () => document.getElementById('modal-scores').classList.add('hidden'));
+        document.getElementById('btn-reset-scores').addEventListener('click', () => {
+          state.scoreBook = {};
+          state.roundsPlayed = 0;
+          state.players.forEach(p => { state.scoreBook[p.name] = 0; });
+          renderLeaderboardModal();
+          renderPlayersBar();
+          broadcastGameState();
+          showToast('已重置所有累積積分', 'info');
+        });
+
+        document.getElementById('btn-local-add-ai').addEventListener('click', () => {
+          const emptySeat = setupConfig.players.find(p => p.enabled === false);
+          if (!emptySeat) {
+            showToast('6 個座位已經全滿囉！', 'info');
+            return;
+          }
+          const idx = setupConfig.players.indexOf(emptySeat);
+          emptySeat.enabled = true;
+          emptySeat.isAI = true;
+          emptySeat.name = DEFAULT_NAMES[idx].startsWith('AI') ? DEFAULT_NAMES[idx] : `AI-電腦${idx + 1}`;
+          playSound('select');
+          renderSetupSeats();
+        });
+        document.getElementById('btn-local-remove-ai').addEventListener('click', () => {
+          const activeCnt = setupConfig.players.filter(p => p.enabled !== false).length;
+          if (activeCnt <= 2) {
+            showToast('至少需要保留 2 位玩家！', 'error');
+            return;
+          }
+          for (let i = setupConfig.players.length - 1; i >= 0; i--) {
+            if (setupConfig.players[i].enabled !== false && setupConfig.players[i].isAI) {
+              setupConfig.players[i].enabled = false;
+              playSound('draw');
+              renderSetupSeats();
+              return;
+            }
+          }
+          showToast('目前沒有可移除的 AI 座位', 'info');
+        });
+
         document.getElementById('btn-add-one-bot').addEventListener('click', addOneAISeat);
+        document.getElementById('btn-remove-one-bot').addEventListener('click', removeOneAISeat);
         document.getElementById('btn-fill-bots').addEventListener('click', fillEmptySeatsWithAI);
 
         // Smooth keyboard shortcuts during human turn
