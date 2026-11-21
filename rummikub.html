@@ -278,6 +278,24 @@
     .dot-black { background-color: #18181b; }
 
     /* Table Set Group */
+    #table-area {
+      cursor: grab;
+    }
+    #table-area.panning {
+      cursor: grabbing;
+    }
+    .remote-ghost-box {
+      position: absolute;
+      pointer-events: none;
+      z-index: 35;
+      transform: translate(-50%, -50%);
+      transition: left 0.14s linear, top 0.14s linear, opacity 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
     .table-set {
       display: inline-flex;
       align-items: center;
@@ -417,6 +435,11 @@
       <button id="btn-setup" type="button" class="px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-sm font-black shadow-md transition">
         ⚙️ 開新局
       </button>
+
+      <!-- Exit / Leave Player Button -->
+      <button id="btn-exit-game" type="button" class="hidden px-3 py-1.5 rounded-xl bg-rose-600/85 hover:bg-rose-500 border border-rose-400/40 text-white text-sm font-bold shadow transition" title="退出目前對局或離開玩家座位">
+        🚪 退出
+      </button>
     </div>
   </header>
 
@@ -446,9 +469,15 @@
       </div>
     </div>
 
-    <!-- Scrollable Table Canvas -->
-    <div id="table-area" class="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-wrap content-start items-start gap-4 sm:gap-5 transition-colors">
+    <!-- Scrollable Table Canvas (Supports Edge Auto-Scroll & Felt Drag-Panning) -->
+    <div id="table-area" class="relative flex-1 overflow-auto p-4 sm:p-6 flex flex-wrap content-start items-start gap-4 sm:gap-5 transition-colors">
       <!-- Sets rendered here -->
+    </div>
+
+    <!-- Live Remote Player Dragging Ghost Overlay -->
+    <div id="remote-drag-ghost" class="remote-ghost-box hidden opacity-95">
+      <div id="remote-ghost-tag" class="px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-xs font-black shadow-lg whitespace-nowrap"></div>
+      <div id="remote-ghost-tile"></div>
     </div>
 
     <!-- Floating Toast Notification -->
@@ -503,7 +532,7 @@
         <button id="btn-sort-color" type="button" class="px-3 py-1.5 rounded-xl bg-black/40 hover:bg-black/55 border border-amber-200/25 text-sm font-bold text-amber-100 transition">
           🎨 顏色排序
         </button>
-        <button id="btn-quick-play" type="button" class="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-slate-950 text-sm font-black transition shadow-md" title="一鍵快速將可出的牌放到桌上（也可雙擊手牌快速放牌）">
+        <button id="btn-quick-play" type="button" class="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-slate-950 text-sm font-black transition shadow-md" title="僅快速打出手中可成形的新牌組（不會更動桌上既有牌組）">
           ⚡ 快速放牌
         </button>
         <button id="btn-hint" type="button" class="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 border border-sky-300/35 text-sm font-bold text-white transition shadow">
@@ -514,6 +543,9 @@
       <div class="flex items-center gap-2">
         <button id="btn-undo" type="button" class="px-4 py-2 rounded-xl bg-stone-700 hover:bg-stone-600 disabled:opacity-40 disabled:cursor-not-allowed text-sm sm:text-base font-bold text-stone-100 shadow transition">
           ↩️ 還原
+        </button>
+        <button id="btn-auto-draw-toggle" type="button" class="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-xs sm:text-sm font-bold text-slate-200 transition" title="開啟後，輪到你但無牌可出時將自動抽一張牌並跳下一位">
+          🔄 自動抽牌：關
         </button>
         <button id="btn-draw" type="button" class="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-sm sm:text-base font-extrabold text-white shadow transition">
           🃏 抽牌換人
@@ -813,6 +845,19 @@
     </div>
   </div>
 
+  <!-- Exit Game / Leave Player Confirmation Modal -->
+  <div id="modal-exit" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3">
+    <div class="bg-slate-900 border border-rose-400/40 rounded-3xl max-w-md w-full p-6 text-center shadow-2xl">
+      <div class="text-4xl mb-2">🚪</div>
+      <h3 class="text-xl font-black text-rose-300">確定要退出對局嗎？</h3>
+      <p id="exit-modal-desc" class="text-sm text-slate-300 mt-2 leading-relaxed">退出後將回到大廳，若為聯機對局，你的座位會自動交由 AI 接手讓其他玩家繼續遊玩。</p>
+      <div class="mt-6 flex items-center justify-center gap-3">
+        <button id="btn-cancel-exit" type="button" class="flex-1 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm transition">繼續遊玩</button>
+        <button id="btn-confirm-exit" type="button" class="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-sm shadow transition">確定退出</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Game Over / Scoreboard Modal -->
   <div id="modal-gameover" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3">
     <div class="bg-slate-900 border border-amber-400/40 rounded-3xl max-w-xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
@@ -824,11 +869,14 @@
       <div id="scoreboard-body" class="p-5 overflow-y-auto space-y-2.5">
         <!-- Rendered dynamically -->
       </div>
-      <div class="px-6 py-4 bg-slate-950/80 border-t border-white/10 flex items-center justify-center gap-3">
-        <button id="btn-rematch" type="button" class="px-6 py-2.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black text-base shadow transition">
-          🔄 原班人馬再一局
+      <div class="px-6 py-4 bg-slate-950/80 border-t border-white/10 flex flex-wrap items-center justify-center gap-3">
+        <button id="btn-rematch" type="button" class="px-6 py-2.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black text-base shadow-lg transition">
+          🔄 重新開始
         </button>
-        <button id="btn-gameover-setup" type="button" class="px-5 py-2.5 rounded-xl bg-white/12 hover:bg-white/22 text-white font-bold text-base transition">
+        <button id="btn-gameover-exit" type="button" class="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-base shadow transition">
+          🚪 退出對局
+        </button>
+        <button id="btn-gameover-setup" type="button" class="px-4 py-2.5 rounded-xl bg-white/12 hover:bg-white/22 text-slate-200 font-bold text-sm transition">
           ⚙️ 重新設定玩家
         </button>
       </div>
@@ -1000,6 +1048,14 @@
         nextSetUid: 1,
         scoreBook: {}, // { playerName: totalPoints }
         roundsPlayed: 0,
+        autoDrawEnabled: false,
+        autoDrawTimeoutHandle: null,
+        draggingTile: null,
+        lastDragSentAt: 0,
+        remoteGhostHideHandle: null,
+        edgeScrollVelY: 0,
+        edgeScrollRaf: null,
+        lastWinnerInfo: null,
         timerRemaining: 90,
         timerHandle: null,
         hostTimeoutGraceHandle: null,
@@ -1317,6 +1373,83 @@
         }
       }
 
+      function broadcastTablePreview() {
+        if (net.mode !== 'online' || !isMyLocalTurn()) return;
+        sendNetMessage({
+          type: 'TABLE_PREVIEW',
+          ts: state.tableSets.map(setObj => [setObj.id, setObj.tiles.map(packTile)])
+        });
+      }
+
+      function showRemoteDragGhost(msg) {
+        const ghost = document.getElementById('remote-drag-ghost');
+        const tag = document.getElementById('remote-ghost-tag');
+        const tileWrap = document.getElementById('remote-ghost-tile');
+        const tableArea = document.getElementById('table-area');
+        if (!ghost || !tableArea) return;
+
+        const rect = tableArea.getBoundingClientRect();
+        const mainRect = tableArea.parentElement.getBoundingClientRect();
+        const x = (rect.left - mainRect.left) + Math.max(0.05, Math.min(0.95, msg.rx || 0.5)) * rect.width;
+        const y = (rect.top - mainRect.top) + Math.max(0.05, Math.min(0.95, msg.ry || 0.5)) * rect.height;
+
+        ghost.style.left = `${x}px`;
+        ghost.style.top = `${y}px`;
+        tag.textContent = `${msg.avatar || '👤'} ${msg.name || '玩家'} 拖牌中`;
+
+        if (msg.isJoker) {
+          const stroke = msg.color === 'red' ? '#dc2626' : '#18181b';
+          tileWrap.innerHTML = `<div class="rummi-tile tile-sm opacity-90 shadow-2xl ring-2 ring-amber-400"><svg viewBox="0 0 36 36" class="joker-svg" fill="none"><circle cx="18" cy="19" r="11" stroke="${stroke}" stroke-width="2.4" fill="#fff"/><path d="M9 12 L13 6 L18 11 L23 6 L27 12" stroke="${stroke}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="14.5" cy="17.5" r="1.8" fill="${stroke}"/><circle cx="21.5" cy="17.5" r="1.8" fill="${stroke}"/><path d="M13.5 22.5 Q18 26.5 22.5 22.5" stroke="${stroke}" stroke-width="2.2" stroke-linecap="round"/></svg></div>`;
+        } else {
+          tileWrap.innerHTML = `<div class="rummi-tile tile-sm opacity-90 shadow-2xl ring-2 ring-amber-400"><span class="tile-num color-${escapeHtml(msg.color || 'black')}">${Number(msg.num) || ''}</span><span class="tile-dot dot-${escapeHtml(msg.color || 'black')}"></span></div>`;
+        }
+
+        ghost.classList.remove('hidden');
+        if (state.remoteGhostHideHandle) clearTimeout(state.remoteGhostHideHandle);
+        state.remoteGhostHideHandle = setTimeout(hideRemoteDragGhost, 2400);
+      }
+
+      function hideRemoteDragGhost() {
+        const ghost = document.getElementById('remote-drag-ghost');
+        if (ghost) ghost.classList.add('hidden');
+        if (state.remoteGhostHideHandle) {
+          clearTimeout(state.remoteGhostHideHandle);
+          state.remoteGhostHideHandle = null;
+        }
+      }
+
+      function stopEdgeAutoScroll() {
+        state.edgeScrollVelY = 0;
+        if (state.edgeScrollRaf) {
+          cancelAnimationFrame(state.edgeScrollRaf);
+          state.edgeScrollRaf = null;
+        }
+      }
+
+      function updateEdgeAutoScroll(clientY) {
+        const tableArea = document.getElementById('table-area');
+        if (!tableArea) return;
+        const rect = tableArea.getBoundingClientRect();
+        const zone = 76;
+        if (clientY < rect.top + zone) {
+          state.edgeScrollVelY = -Math.max(4, Math.round(((rect.top + zone - clientY) / zone) * 14));
+        } else if (clientY > rect.bottom - zone) {
+          state.edgeScrollVelY = Math.max(4, Math.round(((clientY - (rect.bottom - zone)) / zone) * 14));
+        } else {
+          state.edgeScrollVelY = 0;
+        }
+        if (state.edgeScrollVelY !== 0 && !state.edgeScrollRaf) {
+          const step = () => {
+            if (state.edgeScrollVelY === 0) { state.edgeScrollRaf = null; return; }
+            tableArea.scrollTop += state.edgeScrollVelY;
+            state.edgeScrollRaf = requestAnimationFrame(step);
+          };
+          state.edgeScrollRaf = requestAnimationFrame(step);
+        } else if (state.edgeScrollVelY === 0) {
+          stopEdgeAutoScroll();
+        }
+      }
+
       function addRoomEvent(text, kind = 'info') {
         const time = new Date().toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
         net.roomEvents.unshift({ time, text, kind });
@@ -1457,15 +1590,20 @@
         sendNetMessage({ type: 'LOBBY_SYNC', seats: net.seats, roomEvents: net.roomEvents });
       }
 
-      function removeAISeatAt(idx) {
-        if (!net.isHost) return;
+      function removeSeatAt(idx) {
+        if (!net.isHost || idx === 0) return;
         const seat = net.seats[idx];
-        if (!seat || !seat.occupied || !seat.isAI) return;
+        if (!seat || !seat.occupied) return;
         const removedName = seat.name;
+        const wasAI = seat.isAI;
+        const kickedClientId = seat.clientId;
         net.seats[idx] = { occupied: false, isAI: false, clientId: null, name: '', avatar: SEAT_AVATARS[idx] };
-        addRoomEvent(`➖ 房主移除了 AI：${removedName}（座位 #${idx + 1}）`, 'info');
+        addRoomEvent(`${wasAI ? '➖ 房主移除了 AI' : '🚪 房主請離了玩家'}：${removedName}（座位 #${idx + 1}）`, 'warn');
         playSound('draw');
         renderOnlineLobby();
+        if (kickedClientId) {
+          sendNetMessage({ type: 'KICKED', targetId: kickedClientId });
+        }
         sendNetMessage({ type: 'LOBBY_SYNC', seats: net.seats, roomEvents: net.roomEvents });
       }
 
@@ -1473,7 +1611,7 @@
         if (!net.isHost) return;
         for (let i = net.seats.length - 1; i >= 0; i--) {
           if (net.seats[i].occupied && net.seats[i].isAI) {
-            removeAISeatAt(i);
+            removeSeatAt(i);
             return;
           }
         }
@@ -1588,6 +1726,31 @@
           }
         } else if (msg.type === 'GAME_STATE') {
           applySyncedGameState(msg.payload);
+        } else if (msg.type === 'KICKED' && msg.targetId === CLIENT_ID) {
+          showToast('你已被房主移出房間', 'error');
+          leaveOnlineRoom();
+        } else if (msg.type === 'PLAYER_LEFT_GAME') {
+          const leftP = state.players.find(p => p.clientId && p.clientId === msg.senderId);
+          if (leftP && !leftP.isAI) {
+            leftP.isAI = true;
+            leftP.clientId = null;
+            if (!leftP.name.includes('(AI代打)')) leftP.name = `${leftP.name}(AI代打)`;
+            addLog(`🚪 ${leftP.name} 退出了對局，已由 AI 自動接手。`, 'system');
+            showToast(`🚪 ${leftP.name} 退出對局，已由 AI 接手`, 'info');
+            renderAll();
+            if (net.isHost && state.players[state.currentPlayerIndex] === leftP && !state.gameOver) {
+              state.aiTimeoutHandle = setTimeout(() => executeAITurn(), setupConfig.aiDelayMs);
+            }
+          }
+        } else if (msg.type === 'DRAG_MOVE') {
+          showRemoteDragGhost(msg);
+        } else if (msg.type === 'DRAG_END') {
+          hideRemoteDragGhost();
+        } else if (msg.type === 'TABLE_PREVIEW') {
+          if (Array.isArray(msg.ts) && !isMyLocalTurn()) {
+            state.tableSets = msg.ts.map(pair => ({ id: pair[0], tiles: (pair[1] || []).map(unpackTile) }));
+            renderTable();
+          }
         } else if (msg.type === 'CHAT_MSG') {
           appendChatMessage(msg.author, msg.text, false);
         }
@@ -1627,7 +1790,8 @@
           lg: state.logs.slice(0, 6),
           nu: state.nextSetUid,
           sb: state.scoreBook,
-          rp: state.roundsPlayed
+          rp: state.roundsPlayed,
+          wi: state.lastWinnerInfo
         };
       }
 
@@ -1661,6 +1825,7 @@
           state.nextSetUid = data.nu || 1;
           if (data.sb) state.scoreBook = data.sb;
           if (typeof data.rp === 'number') state.roundsPlayed = data.rp;
+          state.lastWinnerInfo = data.wi || null;
         } else {
           if (data.setupConfig) setupConfig = data.setupConfig;
           state.started = data.started;
@@ -1682,18 +1847,23 @@
 
         document.getElementById('modal-setup').classList.add('hidden');
         document.getElementById('btn-close-setup').classList.remove('hidden');
+        document.getElementById('btn-exit-game').classList.remove('hidden');
 
         saveTurnSnapshot();
         renderLogList();
         renderAll();
         playSound('clack');
 
+        hideRemoteDragGhost();
         if (!state.gameOver) {
+          document.getElementById('modal-gameover').classList.add('hidden');
           startTurnTimer();
           const cur = state.players[state.currentPlayerIndex];
           if (cur && cur.isAI && (net.mode !== 'online' || net.isHost)) {
             state.aiTimeoutHandle = setTimeout(() => executeAITurn(), setupConfig.aiDelayMs);
           }
+        } else if (state.lastWinnerInfo) {
+          renderGameOverModalFromInfo(state.lastWinnerInfo);
         }
       }
 
@@ -1788,13 +1958,13 @@
                   <div class="mt-1">${badge}</div>
                 </div>
               </div>
-              ${net.isHost && s.occupied && s.isAI ? `<button type="button" data-remove-ai="${idx}" class="px-2 py-1 rounded-lg bg-rose-600/75 hover:bg-rose-500 text-white text-xs font-bold shrink-0 transition" title="移除此 AI">✕</button>` : ''}
+              ${net.isHost && s.occupied && idx > 0 ? `<button type="button" data-remove-seat="${idx}" class="px-2 py-1 rounded-lg bg-rose-600/75 hover:bg-rose-500 text-white text-xs font-bold shrink-0 transition" title="移除此座位玩家">✕</button>` : ''}
             </div>
           `;
         }).join('');
 
-        grid.querySelectorAll('[data-remove-ai]').forEach(btn => {
-          btn.addEventListener('click', () => removeAISeatAt(Number(btn.dataset.removeAi)));
+        grid.querySelectorAll('[data-remove-seat]').forEach(btn => {
+          btn.addEventListener('click', () => removeSeatAt(Number(btn.dataset.removeSeat)));
         });
 
         // Render live join/leave activity feed
@@ -2211,6 +2381,7 @@
 
         state.started = true;
         state.gameOver = false;
+        state.lastWinnerInfo = null;
         state.tableSets = [];
         state.currentPlayerIndex = 0;
         state.turnNumber = 1;
@@ -2244,6 +2415,7 @@
         document.getElementById('modal-setup').classList.add('hidden');
         document.getElementById('modal-gameover').classList.add('hidden');
         document.getElementById('btn-close-setup').classList.remove('hidden');
+        document.getElementById('btn-exit-game').classList.remove('hidden');
 
         const deckTotal = activeCfg.length >= 5 ? 160 : 106;
         addLog(`🎲 ${activeCfg.length} 人對局開始（${deckTotal} 張牌組）！每人 14 張，牌池剩餘 ${state.pool.length} 張。`, 'system');
@@ -2255,6 +2427,7 @@
         if (state.timerHandle) { clearInterval(state.timerHandle); state.timerHandle = null; }
         if (state.hostTimeoutGraceHandle) { clearTimeout(state.hostTimeoutGraceHandle); state.hostTimeoutGraceHandle = null; }
         if (state.aiTimeoutHandle) { clearTimeout(state.aiTimeoutHandle); state.aiTimeoutHandle = null; }
+        if (state.autoDrawTimeoutHandle) { clearTimeout(state.autoDrawTimeoutHandle); state.autoDrawTimeoutHandle = null; }
       }
 
       function saveTurnSnapshot() {
@@ -2300,6 +2473,16 @@
 
         if (player.isAI && (net.mode !== 'online' || net.isHost)) {
           state.aiTimeoutHandle = setTimeout(() => executeAITurn(), setupConfig.aiDelayMs);
+        } else if (isMyLocalTurn() && state.autoDrawEnabled) {
+          const checkMove = computeSmartMove(player, state.tableSets);
+          if (!checkMove) {
+            showToast('🔄 自動抽牌：目前無牌可出，即將自動抽一張牌...', 'info');
+            state.autoDrawTimeoutHandle = setTimeout(() => {
+              if (isMyLocalTurn() && state.autoDrawEnabled) {
+                handleDrawAction(false);
+              }
+            }, 850);
+          }
         }
       }
 
@@ -2616,31 +2799,55 @@
 
         state.roundsPlayed++;
         rows.forEach(r => {
-          r.finalScore = r.player.id === winner.id ? totalPenalty : -r.penalty;
+          r.finalScore = r.player.id === winner.id ? totalPenalty : 0;
           state.scoreBook[r.player.name] = (state.scoreBook[r.player.name] || 0) + r.finalScore;
           r.totalScore = state.scoreBook[r.player.name];
         });
-        rows.sort((a, b) => b.finalScore - a.finalScore);
+        rows.sort((a, b) => b.finalScore - a.finalScore || a.penalty - b.penalty);
 
-        document.getElementById('winner-title').textContent = `${winner.avatar} ${winner.name} 獲勝！`;
+        state.lastWinnerInfo = {
+          winnerId: winner.id,
+          winnerName: winner.name,
+          winnerAvatar: winner.avatar,
+          reason,
+          totalPenalty,
+          rows: rows.map(r => ({
+            id: r.player.id,
+            name: r.player.name,
+            avatar: r.player.avatar,
+            remainCount: r.player.hand.length,
+            penalty: r.penalty,
+            finalScore: r.finalScore,
+            totalScore: r.totalScore
+          }))
+        };
+
+        addLog(`🏆 本局結束！${winner.name} 獲勝並加分 +${totalPenalty} 分！`, 'win');
+        renderGameOverModalFromInfo(state.lastWinnerInfo);
+        renderAll();
+      }
+
+      function renderGameOverModalFromInfo(info) {
+        if (!info) return;
+        document.getElementById('winner-title').textContent = `${info.winnerAvatar} ${info.winnerName} 獲勝！`;
         document.getElementById('winner-subtitle').textContent =
-          reason === 'empty'
-            ? `率先清空手牌，本局淨得 +${totalPenalty} 分！`
-            : `牌池已空且全員跳過，手牌點數最少者獲勝！`;
+          info.reason === 'empty'
+            ? `本局結束已結算加分：勝者獲得 +${info.totalPenalty} 分！請選擇重新開始或退出`
+            : `牌池已空結算加分：手牌點數最少者獲勝！請選擇重新開始或退出`;
 
-        document.getElementById('scoreboard-body').innerHTML = rows.map((r, rank) => `
-          <div class="flex items-center justify-between px-4 py-3 rounded-2xl ${r.player.id === winner.id ? 'bg-amber-500/20 border border-amber-400/50' : 'bg-white/5 border border-white/10'}">
+        document.getElementById('scoreboard-body').innerHTML = (info.rows || []).map((r, rank) => `
+          <div class="flex items-center justify-between px-4 py-3 rounded-2xl ${r.id === info.winnerId ? 'bg-amber-500/20 border border-amber-400/50' : 'bg-white/5 border border-white/10'}">
             <div class="flex items-center gap-3">
               <span class="w-7 text-center font-black text-base ${rank === 0 ? 'text-amber-300' : 'text-slate-400'}">#${rank + 1}</span>
-              <span class="text-2xl">${r.player.avatar}</span>
+              <span class="text-2xl">${r.avatar}</span>
               <div>
-                <div class="font-bold text-base text-white">${escapeHtml(r.player.name)}</div>
-                <div class="text-xs text-slate-400">剩餘 ${r.player.hand.length} 張牌（點數 ${r.penalty}）</div>
+                <div class="font-bold text-base text-white">${escapeHtml(r.name)}</div>
+                <div class="text-xs text-slate-400">剩餘 ${r.remainCount} 張牌（點數 ${r.penalty}）</div>
               </div>
             </div>
             <div class="text-right">
-              <div class="font-black text-xl tabular-nums ${r.finalScore >= 0 ? 'text-emerald-400' : 'text-rose-400'}">
-                本局 ${r.finalScore > 0 ? '+' : ''}${r.finalScore}
+              <div class="font-black text-xl tabular-nums ${r.finalScore > 0 ? 'text-emerald-400' : 'text-slate-400'}">
+                本局 +${r.finalScore}
               </div>
               <div class="text-xs font-bold text-amber-300 tabular-nums">
                 🏆 累積 ${r.totalScore > 0 ? '+' : ''}${r.totalScore}
@@ -2649,9 +2856,16 @@
           </div>
         `).join('');
 
-        addLog(`🏆 遊戲結束！${winner.name} 獲得勝利（+${totalPenalty} 分）！`, 'win');
+        // In online mode, only Host triggers rematch for the room
+        const rematchBtn = document.getElementById('btn-rematch');
+        if (net.mode === 'online' && !net.isHost) {
+          rematchBtn.textContent = '⏳ 等待房主重新開始';
+          rematchBtn.disabled = true;
+        } else {
+          rematchBtn.textContent = '🔄 重新開始';
+          rematchBtn.disabled = false;
+        }
         document.getElementById('modal-gameover').classList.remove('hidden');
-        renderAll();
       }
 
       function finishGameByLowestScore() {
@@ -2724,6 +2938,7 @@
         }
         state.selected = [];
         renderAll();
+        broadcastTablePreview();
       }
 
       function moveSelectedToExistingSet(targetSetId) {
@@ -2757,6 +2972,7 @@
         }
         state.selected = [];
         renderAll();
+        broadcastTablePreview();
       }
 
       function returnSelectedToHand() {
@@ -2817,6 +3033,7 @@
         }
         state.selected = [];
         renderAll();
+        broadcastTablePreview();
       }
 
       function handleDropOnTableEmpty(dragPayload) {
@@ -2840,6 +3057,7 @@
         }
         state.selected = [];
         renderAll();
+        broadcastTablePreview();
       }
 
       function handleDropOnHand(dragPayload) {
@@ -2920,65 +3138,64 @@
         if (!isMyLocalTurn()) return;
         const player = state.players[state.currentPlayerIndex];
 
-        // Case 1: User already selected specific hand tiles -> smart-place those selected tiles!
+        // Strictly HAND-ONLY: reject if user only selected table tiles
         if (state.selected.length > 0) {
+          const hasTableSel = state.selected.some(s => s.source === 'table');
           const selHandTiles = state.selected
             .filter(s => s.source === 'hand')
             .map(s => player.hand.find(t => t.id === s.tileId))
             .filter(Boolean);
 
-          // 1a: Selected tiles themselves form a valid set -> drop as a new set on table
-          if (selHandTiles.length >= 3 && validateSet(selHandTiles).valid) {
-            moveSelectedToNewSet();
-            showToast('⚡ 已將選取的合法牌組快速放到桌上！', 'success');
+          if (hasTableSel && selHandTiles.length === 0) {
+            playSound('error');
+            showToast('⚡ 快速放牌僅能處理手中的牌，桌上的牌請手動拖曳操作！', 'error');
             return;
           }
 
-          // 1b: If icebroken, try snapping each selected tile into a matching existing table set
-          if (player.hasIcebroken && selHandTiles.length > 0) {
-            let snapped = 0;
-            for (const tile of selHandTiles) {
-              for (const setObj of state.tableSets) {
-                const check = validateSet([...setObj.tiles, tile]);
-                if (check.valid) {
-                  const extracted = extractTileById(tile.id);
-                  if (extracted) {
-                    setObj.tiles = check.orderedTiles;
-                    snapped++;
-                    break;
-                  }
-                }
-              }
+          if (selHandTiles.length >= 3 && validateSet(selHandTiles).valid) {
+            const moved = [];
+            for (const t of selHandTiles) {
+              const ext = extractTileById(t.id);
+              if (ext) moved.push(ext);
             }
-            if (snapped > 0) {
-              state.selected = [];
-              playSound('clack');
-              showToast(`⚡ 已將 ${snapped} 張牌快速併入桌面牌組！按下「確認出牌」即可完成`, 'success');
-              renderAll();
-              return;
-            }
+            const v = validateSet(moved);
+            state.tableSets.push({ id: `set_${state.nextSetUid++}`, tiles: v.orderedTiles });
+            state.selected = [];
+            playSound('clack');
+            showToast(`⚡ 已將手中選取的合法牌組（${v.points} 分）放到桌上！`, 'success');
+            renderAll();
+            return;
           }
         }
 
-        // Case 2: No selection (or selected tiles didn't snap) -> auto-place best valid move from hand!
-        const move = computeSmartMove(player, state.tableSets);
-        if (!move) {
+        // Pure-hand auto quick play ONLY (never modifies or appends to existing table sets!)
+        const minPts = player.hasIcebroken ? 1 : setupConfig.icebreakMin;
+        const pureRes = findBestPureHandPlays(player.hand, minPts);
+        if (pureRes.sets.length === 0) {
           playSound('draw');
-          showToast('⚡ 目前手牌尚無可直接打出的組合，建議先「抽牌換人」。', 'info');
+          const msg = !player.hasIcebroken && setupConfig.icebreakMin > 0
+            ? `⚡ 手牌目前無法單獨湊滿 ${setupConfig.icebreakMin} 分破冰組合！`
+            : '⚡ 手牌目前沒有可單獨組成的新牌組（若要併入桌上牌組請手動拖曳或點「＋」）。';
+          showToast(msg, 'info');
           return;
         }
 
-        state.tableSets = move.newTableSets;
-        player.hand = move.remainingHand;
+        const playedIds = new Set();
+        pureRes.sets.forEach(c => {
+          c.tiles.forEach(t => playedIds.add(t.id));
+          const v = validateSet(c.tiles);
+          state.tableSets.push({ id: `set_${state.nextSetUid++}`, tiles: v.orderedTiles });
+        });
+        player.hand = player.hand.filter(t => !playedIds.has(t.id));
         if (player.sortMode === 'smart') sortHandTiles(player.hand, 'smart');
         state.selected = [];
         state.hintTileIds.clear();
-        state.justPlayedIds = new Set(move.playedIds);
+        state.justPlayedIds = new Set(playedIds);
         playSound('clack');
 
         const msg = !player.hasIcebroken && setupConfig.icebreakMin > 0
-          ? `⚡ 已快速擺上破冰牌組（${move.playedIds.size} 張 / ${move.points} 分）！確認沒問題請按「✅ 確認出牌」`
-          : `⚡ 已快速擺上 ${move.playedIds.size} 張牌！確認沒問題請按「✅ 確認出牌」或「↩️ 還原」`;
+          ? `⚡ 已快速擺上手中破冰牌組（${playedIds.size} 張 / ${pureRes.totalPoints} 分）！確認後請按「✅ 確認出牌」`
+          : `⚡ 已快速擺上手中 ${pureRes.sets.length} 組新牌（${playedIds.size} 張），未更動桌上既有牌組！`;
         showToast(msg, 'success');
         renderAll();
       }
@@ -2989,23 +3206,7 @@
         const tile = player.hand.find(t => t.id === tileId);
         if (!tile) return;
 
-        // 1. If icebroken, try snapping this tile directly into an existing table set
-        if (player.hasIcebroken) {
-          for (const setObj of state.tableSets) {
-            const check = validateSet([...setObj.tiles, tile]);
-            if (check.valid) {
-              extractTileById(tile.id);
-              setObj.tiles = check.orderedTiles;
-              state.selected = [];
-              playSound('clack');
-              showToast(`⚡ 已快速將 ${formatTileLabel(tile)} 加入桌面牌組！`, 'success');
-              renderAll();
-              return;
-            }
-          }
-        }
-
-        // 2. Otherwise check if this tile belongs to a ready pure-hand set -> place that whole set!
+        // Pure-hand ONLY: check if this hand tile belongs to a ready set in hand (never touches existing table sets!)
         const layout = getSmartHandLayout(player.hand);
         const matchingGroup = layout.groups.find(g => g.some(t => t.id === tileId));
         if (matchingGroup) {
@@ -3019,14 +3220,14 @@
             state.tableSets.push({ id: `set_${state.nextSetUid++}`, tiles: v.orderedTiles });
             state.selected = [];
             playSound('clack');
-            showToast(`⚡ 已快速打出整組牌（${v.points} 分）！`, 'success');
+            showToast(`⚡ 已快速打出手中整組牌（${v.points} 分）！`, 'success');
             renderAll();
             return;
           }
         }
 
         playSound('draw');
-        showToast('這張牌目前無法單獨快速放牌，可多選幾張或按「⚡ 快速放牌」', 'info');
+        showToast('這張牌在手中尚未成組（若要併入桌上既有牌組請手動拖曳或點「＋」）', 'info');
       }
 
       function formatTileLabel(t) {
@@ -3089,10 +3290,16 @@
         if (draggable) {
           el.addEventListener('dragstart', (e) => {
             el.classList.add('dragging');
+            state.draggingTile = tile;
             e.dataTransfer.setData('text/plain', JSON.stringify({ tileId: tile.id, source, setId }));
             e.dataTransfer.effectAllowed = 'move';
           });
-          el.addEventListener('dragend', () => el.classList.remove('dragging'));
+          el.addEventListener('dragend', () => {
+            el.classList.remove('dragging');
+            state.draggingTile = null;
+            stopEdgeAutoScroll();
+            if (net.mode === 'online') sendNetMessage({ type: 'DRAG_END' });
+          });
         }
 
         return el;
@@ -3488,14 +3695,67 @@
           if (net.roomCode) copyTextSafe(net.roomCode, `已複製房號 ${net.roomCode}`);
         });
 
-        // Table empty area click & drop
+        // Table empty area click, drop, edge auto-scroll, remote drag sync & felt drag-panning
         const tableArea = document.getElementById('table-area');
+        let isPanningTable = false;
+        let panStartX = 0, panStartY = 0, panScrollL = 0, panScrollT = 0;
+
+        tableArea.addEventListener('mousedown', (e) => {
+          if (e.target !== tableArea) return;
+          isPanningTable = true;
+          panStartX = e.clientX;
+          panStartY = e.clientY;
+          panScrollL = tableArea.scrollLeft;
+          panScrollT = tableArea.scrollTop;
+          tableArea.classList.add('panning');
+        });
+        window.addEventListener('mousemove', (e) => {
+          if (!isPanningTable) return;
+          tableArea.scrollLeft = panScrollL - (e.clientX - panStartX);
+          tableArea.scrollTop = panScrollT - (e.clientY - panStartY);
+        });
+        window.addEventListener('mouseup', () => {
+          if (isPanningTable) {
+            isPanningTable = false;
+            tableArea.classList.remove('panning');
+          }
+        });
+
         tableArea.addEventListener('click', () => {
           if (state.selected.length > 0) moveSelectedToNewSet();
         });
-        tableArea.addEventListener('dragover', (e) => e.preventDefault());
+        tableArea.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          updateEdgeAutoScroll(e.clientY);
+          // Broadcast live dragging tile position to other players in the room (throttled ~160ms)
+          if (net.mode === 'online' && state.draggingTile && isMyLocalTurn()) {
+            const now = Date.now();
+            if (now - state.lastDragSentAt >= 160) {
+              state.lastDragSentAt = now;
+              const rect = tableArea.getBoundingClientRect();
+              const rx = (e.clientX - rect.left) / Math.max(1, rect.width);
+              const ry = (e.clientY - rect.top) / Math.max(1, rect.height);
+              const me = state.players[state.currentPlayerIndex];
+              sendNetMessage({
+                type: 'DRAG_MOVE',
+                rx: Number(rx.toFixed(3)),
+                ry: Number(ry.toFixed(3)),
+                color: state.draggingTile.color,
+                num: state.draggingTile.num,
+                isJoker: state.draggingTile.isJoker,
+                name: me ? me.name : '玩家',
+                avatar: me ? me.avatar : '👤'
+              });
+            }
+          }
+        });
+        tableArea.addEventListener('dragleave', (e) => {
+          if (e.target === tableArea) stopEdgeAutoScroll();
+        });
         tableArea.addEventListener('drop', (e) => {
           e.preventDefault();
+          stopEdgeAutoScroll();
+          if (net.mode === 'online') sendNetMessage({ type: 'DRAG_END' });
           try { handleDropOnTableEmpty(JSON.parse(e.dataTransfer.getData('text/plain'))); } catch (_) {}
         });
 
@@ -3546,6 +3806,71 @@
         document.getElementById('btn-quick-play').addEventListener('click', handleQuickPlay);
         document.getElementById('btn-hint').addEventListener('click', handleHint);
         document.getElementById('btn-undo').addEventListener('click', handleUndoTurn);
+        function updateAutoDrawButtonUI() {
+          const btn = document.getElementById('btn-auto-draw-toggle');
+          if (!btn) return;
+          if (state.autoDrawEnabled) {
+            btn.textContent = '🔄 自動抽牌：開';
+            btn.className = 'px-3 py-2 rounded-xl bg-emerald-500/25 hover:bg-emerald-500/40 border border-emerald-400/60 text-xs sm:text-sm font-black text-emerald-200 transition shadow';
+          } else {
+            btn.textContent = '🔄 自動抽牌：關';
+            btn.className = 'px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-xs sm:text-sm font-bold text-slate-200 transition';
+          }
+        }
+
+        document.getElementById('btn-auto-draw-toggle').addEventListener('click', () => {
+          state.autoDrawEnabled = !state.autoDrawEnabled;
+          updateAutoDrawButtonUI();
+          playSound('select');
+          if (state.autoDrawEnabled) {
+            showToast('🔄 已開啟自動抽牌：輪到你但無牌可出時將自動抽牌換人', 'success');
+            // If it's already our turn and we have no playable move, trigger auto-draw gently
+            if (isMyLocalTurn()) {
+              const p = state.players[state.currentPlayerIndex];
+              if (!computeSmartMove(p, state.tableSets)) {
+                state.autoDrawTimeoutHandle = setTimeout(() => {
+                  if (isMyLocalTurn() && state.autoDrawEnabled) handleDrawAction(false);
+                }, 700);
+              }
+            }
+          } else {
+            if (state.autoDrawTimeoutHandle) {
+              clearTimeout(state.autoDrawTimeoutHandle);
+              state.autoDrawTimeoutHandle = null;
+            }
+            showToast('已關閉自動抽牌', 'info');
+          }
+        });
+
+        document.getElementById('btn-exit-game').addEventListener('click', () => {
+          const desc = document.getElementById('exit-modal-desc');
+          desc.textContent = net.mode === 'online'
+            ? '退出後將離開聯機房間並回到大廳，你的座位會自動交由 AI 接手，不影響其他玩家繼續對局。'
+            : '退出後將結束目前對局並返回設定大廳。';
+          document.getElementById('modal-exit').classList.remove('hidden');
+        });
+        document.getElementById('btn-cancel-exit').addEventListener('click', () => {
+          document.getElementById('modal-exit').classList.add('hidden');
+        });
+        document.getElementById('btn-confirm-exit').addEventListener('click', () => {
+          document.getElementById('modal-exit').classList.add('hidden');
+          clearTimers();
+          if (net.mode === 'online') {
+            sendNetMessage({ type: 'PLAYER_LEFT_GAME' });
+            leaveOnlineRoom();
+          }
+          state.started = false;
+          state.gameOver = false;
+          state.selected = [];
+          document.getElementById('btn-exit-game').classList.add('hidden');
+          document.getElementById('btn-close-setup').classList.add('hidden');
+          renderSetupSeats();
+          renderOnlineLobby();
+          document.getElementById('modal-setup').classList.remove('hidden');
+          playSound('draw');
+          showToast('🚪 已退出對局並回到大廳', 'info');
+        });
+
         document.getElementById('btn-draw').addEventListener('click', () => handleDrawAction(false));
         document.getElementById('btn-confirm').addEventListener('click', handleConfirmPlay);
 
@@ -3772,6 +4097,24 @@
         document.getElementById('btn-rematch').addEventListener('click', () => {
           startGame();
           broadcastGameState();
+        });
+        document.getElementById('btn-gameover-exit').addEventListener('click', () => {
+          document.getElementById('modal-gameover').classList.add('hidden');
+          clearTimers();
+          if (net.mode === 'online') {
+            sendNetMessage({ type: 'PLAYER_LEFT_GAME' });
+            leaveOnlineRoom();
+          }
+          state.started = false;
+          state.gameOver = false;
+          state.selected = [];
+          document.getElementById('btn-exit-game').classList.add('hidden');
+          document.getElementById('btn-close-setup').classList.add('hidden');
+          renderSetupSeats();
+          renderOnlineLobby();
+          document.getElementById('modal-setup').classList.remove('hidden');
+          playSound('draw');
+          showToast('🚪 已退出對局並回到大廳', 'info');
         });
         document.getElementById('btn-gameover-setup').addEventListener('click', () => {
           document.getElementById('modal-gameover').classList.add('hidden');
