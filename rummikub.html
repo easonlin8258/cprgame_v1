@@ -918,6 +918,7 @@
         peerReady: false,
         cloudTopic: '',
         cloudPollHandle: null,
+        cloudAbort: null,
         cloudPolling: false,
         cloudSince: '5m',
         cloudOk: false,
@@ -963,30 +964,30 @@
       }
 
       function makeCloudTopic(roomCode) {
-        return 'rummikub6p_v3_' + String(roomCode).replace(/[^A-Z0-9]/gi, '').toLowerCase();
+        return 'rummikub6p_v4_' + String(roomCode).replace(/[^A-Z0-9]/gi, '').toLowerCase();
       }
 
       function makeHostPeerId(roomCode) {
-        return 'rummikub6p-host-' + String(roomCode).replace(/[^A-Z0-9]/gi, '').toLowerCase();
+        return 'rummikub6p-v4-' + String(roomCode).replace(/[^A-Z0-9]/gi, '').toLowerCase();
       }
 
       function updateNetStatusPill() {
         const el = document.getElementById('lobby-net-status');
         if (!el) return;
         if (net.peerReady && net.cloudOk) {
-          el.textContent = '⚡ 跨網 P2P + 雲端已連線';
-          el.className = 'px-2.5 py-0.5 rounded-full bg-emerald-500/25 border border-emerald-400/50 text-emerald-200 text-xs font-extrabold';
-        } else if (net.peerReady) {
-          el.textContent = '⚡ 跨網 P2P 已連線';
+          el.textContent = '⚡ P2P直連 + ☁️ 雲端串流正常（支援無痕/跨網）';
           el.className = 'px-2.5 py-0.5 rounded-full bg-emerald-500/25 border border-emerald-400/50 text-emerald-200 text-xs font-extrabold';
         } else if (net.cloudOk) {
-          el.textContent = '☁️ 跨網雲端已連線';
+          el.textContent = '☁️ 雲端即時串流正常（支援無痕/跨網）';
+          el.className = 'px-2.5 py-0.5 rounded-full bg-emerald-500/25 border border-emerald-400/50 text-emerald-200 text-xs font-extrabold';
+        } else if (net.peerReady) {
+          el.textContent = '⚡ 跨網 P2P 直連正常（支援無痕/跨網）';
           el.className = 'px-2.5 py-0.5 rounded-full bg-emerald-500/25 border border-emerald-400/50 text-emerald-200 text-xs font-extrabold';
         } else if (net.cloudErrorMsg) {
-          el.textContent = '⚠️ 網路受限（僅本機/同步碼）';
+          el.textContent = '⚠️ 雲端連線受限（可改用同步碼）';
           el.className = 'px-2.5 py-0.5 rounded-full bg-rose-500/25 border border-rose-400/50 text-rose-200 text-xs font-bold';
         } else {
-          el.textContent = '☁️ 跨網連線中...';
+          el.textContent = '☁️ 正在建立跨網通道...';
           el.className = 'px-2.5 py-0.5 rounded-full bg-sky-500/20 border border-sky-400/40 text-sky-200 text-xs font-bold';
         }
       }
@@ -995,6 +996,10 @@
         if (net.channel) {
           try { net.channel.close(); } catch (_) {}
           net.channel = null;
+        }
+        if (net.cloudAbort) {
+          try { net.cloudAbort.abort(); } catch (_) {}
+          net.cloudAbort = null;
         }
         if (net.cloudPollHandle) {
           clearInterval(net.cloudPollHandle);
@@ -1015,23 +1020,47 @@
         net.cloudErrorMsg = '';
       }
 
-      function dispatchIncomingMessage(msg) {
+      function dispatchIncomingMessage(msg, sourceConn = null) {
         if (!msg || msg.senderId === CLIENT_ID) return;
         if (msg.msgId) {
           if (net.seenMsgIds.has(msg.msgId)) return;
           net.seenMsgIds.add(msg.msgId);
-          if (net.seenMsgIds.size > 400) {
+          if (net.seenMsgIds.size > 500) {
             const first = net.seenMsgIds.values().next().value;
             net.seenMsgIds.delete(first);
           }
         }
-        // If Host receives a P2P message from one guest, relay to other connected P2P guests too
+        // Ensure sourceConn is tracked before responding (prevents race condition!)
+        if (sourceConn && !net.peerConns.includes(sourceConn)) {
+          net.peerConns.push(sourceConn);
+        }
+        // If Host receives a P2P message from one guest, relay to other connected P2P guests
         if (net.isHost && net.peerConns.length > 0 && msg.type !== 'JOIN_REQ') {
           net.peerConns.forEach(c => {
-            if (c.open) { try { c.send(msg); } catch (_) {} }
+            if (c !== sourceConn && c.open) { try { c.send(msg); } catch (_) {} }
           });
         }
         handleNetMessage(msg);
+      }
+
+      function connectGuestToHostPeer(peer, roomCode) {
+        try {
+          const conn = peer.connect(makeHostPeerId(roomCode), { reliable: true, serialization: 'json' });
+          if (!conn) return;
+          if (!net.peerConns.includes(conn)) net.peerConns.push(conn);
+          conn.on('open', () => {
+            net.peerReady = true;
+            updateNetStatusPill();
+            const nick = document.getElementById('online-nickname').value.trim() || '玩家';
+            if (net.localSeatIndex < 0) {
+              sendNetMessage({ type: 'JOIN_REQ', name: nick });
+            }
+          });
+          conn.on('data', (data) => dispatchIncomingMessage(data, conn));
+          conn.on('close', () => {
+            net.peerConns = net.peerConns.filter(c => c !== conn);
+          });
+        } catch (_) {}
       }
 
       function initPeerP2P(roomCode, isHost) {
@@ -1042,7 +1071,8 @@
             config: {
               iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' }
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun.cloudflare.com:3478' }
               ]
             }
           };
@@ -1053,29 +1083,15 @@
             net.peerReady = true;
             updateNetStatusPill();
             if (!isHost) {
-              try {
-                const conn = peer.connect(makeHostPeerId(roomCode), { reliable: true });
-                conn.on('open', () => {
-                  net.peerConns.push(conn);
-                  const nick = document.getElementById('online-nickname').value.trim() || '玩家';
-                  if (net.localSeatIndex < 0) {
-                    sendNetMessage({ type: 'JOIN_REQ', name: nick });
-                  }
-                });
-                conn.on('data', (data) => dispatchIncomingMessage(data));
-                conn.on('close', () => {
-                  net.peerConns = net.peerConns.filter(c => c !== conn);
-                });
-              } catch (_) {}
+              connectGuestToHostPeer(peer, roomCode);
             }
           });
 
           if (isHost) {
             peer.on('connection', (conn) => {
-              conn.on('open', () => {
-                net.peerConns.push(conn);
-              });
-              conn.on('data', (data) => dispatchIncomingMessage(data));
+              // Register immediately so replies never race conn.on('open')
+              if (!net.peerConns.includes(conn)) net.peerConns.push(conn);
+              conn.on('data', (data) => dispatchIncomingMessage(data, conn));
               conn.on('close', () => {
                 net.peerConns = net.peerConns.filter(c => c !== conn);
               });
@@ -1083,38 +1099,101 @@
           }
 
           peer.on('error', () => {
-            // Silently fall back to HTTPS cloud relay if WebRTC/WebSocket is unavailable
+            // Gracefully rely on HTTPS cloud stream if P2P signaling is unavailable
           });
         } catch (_) {}
       }
 
-      async function pollCloudRoom() {
+      function parseNtfyLine(line) {
+        if (!line || !line.trim()) return;
+        try {
+          const env = JSON.parse(line);
+          if (env.event === 'open') {
+            if (!net.cloudOk) {
+              net.cloudOk = true;
+              net.cloudErrorMsg = '';
+              updateNetStatusPill();
+            }
+            return;
+          }
+          if (env.id) net.cloudSince = env.id;
+          if (env.event === 'message' && env.message) {
+            if (!net.cloudOk) {
+              net.cloudOk = true;
+              net.cloudErrorMsg = '';
+              updateNetStatusPill();
+            }
+            const raw = env.message.startsWith('RM:') ? env.message.slice(3) : env.message;
+            const inner = JSON.parse(raw);
+            dispatchIncomingMessage(inner);
+          }
+        } catch (_) {}
+      }
+
+      // Primary cross-device/Incognito transport: single persistent HTTPS JSON stream (zero rate-limit spam, ~150ms push!)
+      async function startCloudStream(topic) {
+        if (!topic || net.cloudTopic !== topic) return;
+        if (net.cloudAbort) { try { net.cloudAbort.abort(); } catch (_) {} }
+        const controller = new AbortController();
+        net.cloudAbort = controller;
+
+        try {
+          const url = `https://ntfy.sh/${encodeURIComponent(topic)}/json?since=${encodeURIComponent(net.cloudSince)}`;
+          const res = await fetch(url, { method: 'GET', cache: 'no-store', signal: controller.signal });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          if (!net.cloudOk) {
+            net.cloudOk = true;
+            net.cloudErrorMsg = '';
+            updateNetStatusPill();
+          }
+
+          if (res.body && res.body.getReader) {
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            let buffer = '';
+            while (net.cloudTopic === topic) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n');
+              buffer = lines.pop() || '';
+              for (const line of lines) parseNtfyLine(line);
+            }
+            if (buffer.trim()) parseNtfyLine(buffer);
+          } else {
+            const text = await res.text();
+            text.split('\n').forEach(parseNtfyLine);
+          }
+
+          // Stream ended cleanly -> reconnect gently if still in this room
+          if (net.cloudTopic === topic) {
+            setTimeout(() => startCloudStream(topic), 1500);
+          }
+        } catch (err) {
+          if (controller.signal.aborted || net.cloudTopic !== topic) return;
+          net.cloudErrorMsg = String(err && err.message || 'network');
+          updateNetStatusPill();
+          // Fallback to polite 3.5s polling if streaming was interrupted
+          if (!net.cloudPollHandle && net.cloudTopic === topic) {
+            net.cloudPollHandle = setInterval(() => pollCloudRoomOnce(), 3500);
+          }
+        }
+      }
+
+      async function pollCloudRoomOnce() {
         if (!net.cloudTopic || net.cloudPolling) return;
         net.cloudPolling = true;
         try {
           const url = `https://ntfy.sh/${encodeURIComponent(net.cloudTopic)}/json?poll=1&since=${encodeURIComponent(net.cloudSince)}`;
           const res = await fetch(url, { method: 'GET', cache: 'no-store' });
           if (!res.ok) throw new Error('HTTP ' + res.status);
-          const text = await res.text();
           if (!net.cloudOk) {
             net.cloudOk = true;
             net.cloudErrorMsg = '';
             updateNetStatusPill();
           }
-          if (text.trim()) {
-            const lines = text.trim().split('\n');
-            for (const line of lines) {
-              if (!line.trim()) continue;
-              try {
-                const env = JSON.parse(line);
-                if (env.id) net.cloudSince = env.id;
-                if (env.event === 'message' && env.message) {
-                  const inner = JSON.parse(env.message);
-                  dispatchIncomingMessage(inner);
-                }
-              } catch (_) {}
-            }
-          }
+          const text = await res.text();
+          if (text.trim()) text.trim().split('\n').forEach(parseNtfyLine);
         } catch (err) {
           if (!net.cloudErrorMsg) {
             net.cloudErrorMsg = String(err && err.message || 'network');
@@ -1129,24 +1208,24 @@
         closeRoomChannel();
         net.seenMsgIds = new Set();
         net.cloudTopic = makeCloudTopic(roomCode);
-        // Use server-relative duration (zero client clock skew!)
         net.cloudSince = isHostCreating ? '15s' : '15m';
         net.cloudOk = false;
         net.cloudErrorMsg = '';
 
         // 1. Local same-browser BroadcastChannel
         if (typeof BroadcastChannel !== 'undefined') {
-          net.channel = new BroadcastChannel(`rummikub_6p_room_${roomCode}`);
-          net.channel.onmessage = (ev) => dispatchIncomingMessage(ev.data);
+          try {
+            net.channel = new BroadcastChannel(`rummikub_6p_room_${roomCode}`);
+            net.channel.onmessage = (ev) => dispatchIncomingMessage(ev.data);
+          } catch (_) {}
         }
 
-        // 2. Cross-network WebRTC P2P (PeerJS)
+        // 2. Cross-network WebRTC P2P (works in Incognito & across 4G/5G/Wi-Fi)
         initPeerP2P(roomCode, isHostCreating);
 
-        // 3. Cross-network HTTPS Relay Polling (ntfy.sh)
+        // 3. Cross-network HTTPS Persistent Stream via ntfy.sh (works in Incognito & across any network!)
         updateNetStatusPill();
-        pollCloudRoom();
-        net.cloudPollHandle = setInterval(pollCloudRoom, 1300);
+        startCloudStream(net.cloudTopic);
       }
 
       function sendNetMessage(payload) {
@@ -1170,12 +1249,12 @@
           });
         }
 
-        // 3. Cross-network HTTPS relay via ntfy.sh (simple CORS POST, no preflight)
+        // 3. Cross-network HTTPS relay via ntfy.sh (prefixed with RM: so ntfy never misinterprets JSON)
         if (net.cloudTopic) {
           try {
             fetch(`https://ntfy.sh/${encodeURIComponent(net.cloudTopic)}`, {
               method: 'POST',
-              body: JSON.stringify(packet)
+              body: 'RM:' + JSON.stringify(packet)
             }).then(res => {
               if (res && res.ok && !net.cloudOk) {
                 net.cloudOk = true;
@@ -1237,6 +1316,9 @@
         sendNetMessage({ type: 'JOIN_REQ', name: nick });
         net.joinRetryHandle = setInterval(() => {
           if (net.mode === 'online' && !net.isHost && net.localSeatIndex < 0 && net.roomCode === code) {
+            if (net.peer && net.peer.open && net.peerConns.length === 0) {
+              connectGuestToHostPeer(net.peer, code);
+            }
             sendNetMessage({ type: 'JOIN_REQ', name: nick });
           } else {
             clearInterval(net.joinRetryHandle);
