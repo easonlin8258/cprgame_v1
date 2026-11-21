@@ -405,7 +405,7 @@
       <!-- Turn Timer -->
       <div id="timer-badge" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/45 border border-white/20 text-sm font-extrabold tabular-nums text-amber-200">
         <span>⏱</span>
-        <span id="timer-display">90s</span>
+        <span id="timer-display">30s</span>
       </div>
 
       <!-- UI Scale Toggle -->
@@ -723,8 +723,9 @@
           <label class="block">
             <span class="text-sm font-bold text-slate-200">每回合限時</span>
             <select id="opt-timer" class="mt-1.5 w-full rounded-xl bg-slate-800 border border-white/15 px-3.5 py-2 text-sm sm:text-base font-semibold text-white focus:outline-none focus:border-amber-400">
+              <option value="30" selected>30 秒</option>
               <option value="60">60 秒</option>
-              <option value="90" selected>90 秒</option>
+              <option value="90">90 秒</option>
               <option value="120">120 秒</option>
               <option value="0">不限時</option>
             </select>
@@ -1183,7 +1184,7 @@
             net.joinStatus = 'connected';
             net.seats = Array.isArray(saved.net.seats) ? saved.net.seats : [];
             net.roomEvents = Array.isArray(saved.net.roomEvents) ? saved.net.roomEvents : [];
-            openRoomChannel(net.roomCode, false);
+            openRoomChannel(net.roomCode, net.isHost);
             updateHeaderRoomBadge();
             renderOnlineLobby();
             sendNetMessage({ type: 'SYNC_REQ' });
@@ -1213,7 +1214,7 @@
           avatar: SEAT_AVATARS[i]
         })),
         icebreakMin: 30,
-        turnSeconds: 90,
+        turnSeconds: 30,
         aiDelayMs: 550
       };
 
@@ -1271,7 +1272,7 @@
         edgeScrollVelY: 0,
         edgeScrollRaf: null,
         lastWinnerInfo: null,
-        timerRemaining: 90,
+        timerRemaining: 30,
         timerHandle: null,
         hostTimeoutGraceHandle: null,
         aiTimeoutHandle: null
@@ -1857,13 +1858,101 @@
 
       function handleNetMessage(msg) {
         if (msg.type === 'JOIN_REQ' && net.isHost) {
-          // If same client re-requests, reuse their seat
+          // CASE A: Game is ALREADY running -> allow reconnecting, taking over an AI seat, or joining mid-game!
+          if (state.started && !state.gameOver) {
+            // 1) Check if this client is already in the active game (reconnecting)
+            let pIdx = state.players.findIndex(p => p.clientId && p.clientId === msg.senderId);
+            let joinMode = 'reconnect';
+
+            if (pIdx < 0) {
+              // 2) Take over an AI player's seat if available
+              pIdx = state.players.findIndex(p => p.isAI);
+              if (pIdx >= 0) joinMode = 'takeover_ai';
+            }
+
+            if (pIdx < 0 && state.players.length < 6 && state.pool.length >= 14) {
+              // 3) Deal 14 tiles from pool and add as a new player mid-game!
+              const newIdx = state.players.length;
+              let finalName = (msg.name || '').trim() || `玩家 ${newIdx + 1}`;
+              if (state.players.some(p => p.name === finalName)) {
+                finalName = finalName === '玩家 1' ? `玩家 ${newIdx + 1}` : `${finalName} (#${newIdx + 1})`;
+              }
+              const newHand = state.pool.splice(0, 14);
+              const newAvatar = SEAT_AVATARS[newIdx % SEAT_AVATARS.length];
+              if (typeof state.scoreBook[finalName] !== 'number') state.scoreBook[finalName] = 0;
+              state.players.push({
+                id: newIdx,
+                name: finalName,
+                isAI: false,
+                clientId: msg.senderId,
+                avatar: newAvatar,
+                hand: newHand,
+                hasIcebroken: setupConfig.icebreakMin === 0,
+                hasTimedOut: false,
+                sortMode: 'manual'
+              });
+              pIdx = newIdx;
+              joinMode = 'new_seat';
+            }
+
+            if (pIdx >= 0) {
+              const targetP = state.players[pIdx];
+              if (joinMode === 'takeover_ai') {
+                let finalName = (msg.name || '').trim() || `玩家 ${pIdx + 1}`;
+                if (state.players.some((p, i) => i !== pIdx && p.name === finalName)) {
+                  finalName = finalName === '玩家 1' ? `玩家 ${pIdx + 1}` : `${finalName} (#${pIdx + 1})`;
+                }
+                const oldName = targetP.name;
+                targetP.isAI = false;
+                targetP.clientId = msg.senderId;
+                targetP.name = finalName;
+                if (typeof state.scoreBook[finalName] !== 'number') {
+                  state.scoreBook[finalName] = state.scoreBook[oldName] || 0;
+                }
+              }
+
+              // Sync lobby seats array to reflect live players
+              net.seats = SEAT_AVATARS.map((avatar, idx) => {
+                const pl = state.players[idx];
+                return pl
+                  ? { occupied: true, isAI: pl.isAI, clientId: pl.clientId, name: pl.name, avatar: pl.avatar }
+                  : { occupied: false, isAI: false, clientId: null, name: '', avatar };
+              });
+              net.lastJoinedSeat = pIdx;
+
+              const actionNote = joinMode === 'takeover_ai'
+                ? `接手了 AI 座位 #${pIdx + 1}`
+                : joinMode === 'new_seat'
+                  ? `中途發牌加入座位 #${pIdx + 1}`
+                  : `重新連回座位 #${pIdx + 1}`;
+              addRoomEvent(`🎉 ${targetP.avatar} 「${targetP.name}」${actionNote}！`, 'join');
+              addLog(`🎉 ${targetP.avatar} ${targetP.name} ${actionNote}！`, 'system');
+
+              sendNetMessage({
+                type: 'JOIN_ACK',
+                targetId: msg.senderId,
+                seatIndex: pIdx,
+                assignedName: targetP.name,
+                seats: net.seats,
+                roomEvents: net.roomEvents
+              });
+              // Push the live game state immediately so the friend enters the active game board!
+              broadcastGameState();
+              renderAll();
+              showToast(`🎉 ${targetP.avatar} ${targetP.name} ${actionNote}！`, 'success');
+              playSound('success');
+            } else {
+              sendNetMessage({ type: 'JOIN_FULL', targetId: msg.senderId });
+            }
+            return;
+          }
+
+          // CASE B: Still in Lobby (before game starts)
           let seatIdx = net.seats.findIndex(s => s.occupied && s.clientId === msg.senderId);
           if (seatIdx < 0) seatIdx = net.seats.findIndex(s => !s.occupied);
-          if (seatIdx < 0 && !state.started) seatIdx = net.seats.findIndex(s => s.isAI);
+          if (seatIdx < 0) seatIdx = net.seats.findIndex(s => s.isAI);
 
           if (seatIdx >= 0) {
-            // Avoid duplicate nicknames so everyone can tell who joined!
             let finalName = (msg.name || '').trim() || `玩家 ${seatIdx + 1}`;
             const dup = net.seats.some((s, i) => i !== seatIdx && s.occupied && s.name === finalName);
             if (dup) {
@@ -1898,9 +1987,6 @@
             renderOnlineLobby();
             showToast(`🎉 ${SEAT_AVATARS[seatIdx]} ${finalName} 加入了座位 #${seatIdx + 1}！`, 'success');
             playSound('success');
-            if (state.started) {
-              broadcastGameState();
-            }
           } else {
             sendNetMessage({ type: 'JOIN_FULL', targetId: msg.senderId });
           }
