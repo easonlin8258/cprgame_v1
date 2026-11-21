@@ -557,7 +557,7 @@
         <button id="btn-undo" type="button" class="px-4 py-2 rounded-xl bg-stone-700 hover:bg-stone-600 disabled:opacity-40 disabled:cursor-not-allowed text-sm sm:text-base font-bold text-stone-100 shadow transition">
           ↩️ 還原
         </button>
-        <button id="btn-auto-draw-toggle" type="button" class="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-xs sm:text-sm font-bold text-slate-200 transition" title="開啟後，輪到你但無牌可出時將自動抽一張牌並跳下一位">
+        <button id="btn-auto-draw-toggle" type="button" class="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-xs sm:text-sm font-bold text-slate-200 transition" title="開啟後，每回合輪到你都會持續自動抽牌並跳下一位，直到手動關閉">
           🔄 自動抽牌：關
         </button>
         <button id="btn-draw" type="button" class="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-sm sm:text-base font-extrabold text-white shadow transition">
@@ -2171,6 +2171,8 @@
           const cur = state.players[state.currentPlayerIndex];
           if (cur && cur.isAI && (net.mode !== 'online' || net.isHost)) {
             state.aiTimeoutHandle = setTimeout(() => executeAITurn(), setupConfig.aiDelayMs);
+          } else {
+            scheduleAutoDrawIfEnabled();
           }
         } else if (state.lastWinnerInfo) {
           renderGameOverModalFromInfo(state.lastWinnerInfo);
@@ -2785,16 +2787,24 @@
 
         if (player.isAI && (net.mode !== 'online' || net.isHost)) {
           state.aiTimeoutHandle = setTimeout(() => executeAITurn(), setupConfig.aiDelayMs);
-        } else if (isMyLocalTurn() && state.autoDrawEnabled === true) {
-          const checkMove = computeSmartMove(player, state.tableSets);
-          if (!checkMove) {
-            showToast('🔄 自動抽牌：目前無牌可出，即將自動抽一張牌...', 'info');
-            state.autoDrawTimeoutHandle = setTimeout(() => {
-              if (isMyLocalTurn() && state.autoDrawEnabled) {
-                handleDrawAction(false);
-              }
-            }, 850);
-          }
+        } else {
+          scheduleAutoDrawIfEnabled();
+        }
+      }
+
+      function scheduleAutoDrawIfEnabled() {
+        if (state.autoDrawTimeoutHandle) {
+          clearTimeout(state.autoDrawTimeoutHandle);
+          state.autoDrawTimeoutHandle = null;
+        }
+        if (state.autoDrawEnabled === true && isMyLocalTurn() && !state.gameOver && !state.waitingPass) {
+          showToast('🔄 自動抽牌運作中...（再次點擊可關閉）', 'info');
+          state.autoDrawTimeoutHandle = setTimeout(() => {
+            state.autoDrawTimeoutHandle = null;
+            if (state.autoDrawEnabled === true && isMyLocalTurn() && !state.gameOver) {
+              handleDrawAction(false);
+            }
+          }, 650);
         }
       }
 
@@ -4298,16 +4308,8 @@
           updateAutoDrawButtonUI();
           playSound('select');
           if (state.autoDrawEnabled) {
-            showToast('🔄 已開啟自動抽牌：輪到你但無牌可出時將自動抽牌換人', 'success');
-            // If it's already our turn and we have no playable move, trigger auto-draw gently
-            if (isMyLocalTurn()) {
-              const p = state.players[state.currentPlayerIndex];
-              if (!computeSmartMove(p, state.tableSets)) {
-                state.autoDrawTimeoutHandle = setTimeout(() => {
-                  if (isMyLocalTurn() && state.autoDrawEnabled) handleDrawAction(false);
-                }, 700);
-              }
-            }
+            showToast('🔄 已開啟自動抽牌：每回合輪到你都會持續自動抽牌，直到手動關閉', 'success');
+            scheduleAutoDrawIfEnabled();
           } else {
             if (state.autoDrawTimeoutHandle) {
               clearTimeout(state.autoDrawTimeoutHandle);
