@@ -1254,6 +1254,7 @@
         currentPlayerIndex: 0,
         turnNumber: 1,
         consecutivePasses: 0,
+        finalRoundLeft: 0,
         turnSnapshot: null,
         selected: [],
         hintTileIds: new Set(),
@@ -2095,6 +2096,7 @@
           cp: state.currentPlayerIndex,
           tn: state.turnNumber,
           cpas: state.consecutivePasses,
+          fr: state.finalRoundLeft,
           jp: Array.from(state.justPlayedIds),
           jd: state.justDrawnId,
           lg: state.logs.slice(0, 6),
@@ -2129,6 +2131,7 @@
           state.currentPlayerIndex = data.cp || 0;
           state.turnNumber = data.tn || 1;
           state.consecutivePasses = data.cpas || 0;
+          state.finalRoundLeft = data.fr || 0;
           state.justPlayedIds = new Set(data.jp || []);
           state.justDrawnId = data.jd || null;
           state.logs = data.lg || [];
@@ -2698,6 +2701,7 @@
         state.currentPlayerIndex = 0;
         state.turnNumber = 1;
         state.consecutivePasses = 0;
+        state.finalRoundLeft = 0;
         state.selected = [];
         state.autoDrawEnabled = false;
         state.hintTileIds = new Set();
@@ -2798,7 +2802,17 @@
           state.autoDrawTimeoutHandle = null;
         }
         if (state.autoDrawEnabled === true && isMyLocalTurn() && !state.gameOver && !state.waitingPass) {
-          showToast('🔄 自動抽牌運作中...（再次點擊可關閉）', 'info');
+          if (state.pool.length === 0) {
+            const p = state.players[state.currentPlayerIndex];
+            const mustMove = computeSmartMove(p, state.tableSets);
+            if (mustMove) {
+              state.hintTileIds = new Set(mustMove.playedIds);
+              showToast('🔔 最後一輪有牌必出！已標出可出的牌，請出牌！', 'info');
+              renderAll();
+              return;
+            }
+          }
+          showToast(state.pool.length === 0 ? '🔄 最後一輪無牌可出，自動 Pass...' : '🔄 自動抽牌運作中...（再次點擊可關閉）', 'info');
           state.autoDrawTimeoutHandle = setTimeout(() => {
             state.autoDrawTimeoutHandle = null;
             if (state.autoDrawEnabled === true && isMyLocalTurn() && !state.gameOver) {
@@ -2891,25 +2905,41 @@
           advanceTurn();
         } else {
           state.justPlayedIds.clear();
+          let justTriggered = false;
           if (state.pool.length > 0) {
             player.hand.push(state.pool.pop());
             state.consecutivePasses = 0;
             playSound('draw');
             addLog(`🃏 ${player.name} 抽了一張牌（手牌 ${player.hand.length} 張）。`, 'draw');
+            if (state.pool.length === 0 && state.finalRoundLeft === 0) {
+              checkPoolExhaustedTrigger();
+              justTriggered = true;
+            }
           } else {
             state.consecutivePasses++;
-            addLog(`⏭️ 牌池已空，${player.name} 跳過回合。`, 'draw');
-            if (state.consecutivePasses >= state.players.length) {
-              finishGameByLowestScore();
-              broadcastGameState();
-              return;
-            }
+            addLog(`⏭️ 【最後一輪】${player.name} 無牌可出，選擇 Pass。`, 'draw');
           }
-          advanceTurn();
+          advanceTurn(justTriggered);
         }
       }
 
-      function advanceTurn() {
+      function checkPoolExhaustedTrigger() {
+        if (state.pool.length === 0 && state.finalRoundLeft === 0) {
+          state.finalRoundLeft = state.players.length;
+          addLog(`🔔 牌池已抽完！進入【最後一輪】（共 ${state.players.length} 人次）— 有牌必出，無牌可 Pass！`, 'system');
+          showToast('🔔 牌池已抽完！進入【最後一輪】：有牌必出，無牌可 Pass！', 'info');
+        }
+      }
+
+      function advanceTurn(justTriggeredFinal = false) {
+        if (!justTriggeredFinal && state.finalRoundLeft > 0) {
+          state.finalRoundLeft--;
+          if (state.finalRoundLeft <= 0) {
+            finishGameByLowestScore();
+            broadcastGameState();
+            return;
+          }
+        }
         state.currentPlayerIndex = (state.currentPlayerIndex + 1) % state.players.length;
         if (state.currentPlayerIndex === 0) state.turnNumber++;
         beginTurn(true);
@@ -2937,6 +2967,7 @@
         state.selected = [];
         state.hintTileIds.clear();
         state.justPlayedIds.clear();
+        let justTriggered = false;
         if (state.pool.length > 0) {
           const drawn = state.pool.pop();
           player.hand.push(drawn);
@@ -2946,17 +2977,16 @@
           player.hasTimedOut = true;
           addLog(`⏰ ${player.name} 超時自動抽牌！之後每回合限時縮短為 20 秒。`, 'draw');
           showToast(`⏰ ${player.name} 超時抽牌，之後每回合僅剩 20 秒！`, 'error');
+          if (state.pool.length === 0 && state.finalRoundLeft === 0) {
+            checkPoolExhaustedTrigger();
+            justTriggered = true;
+          }
         } else {
           state.consecutivePasses++;
           player.hasTimedOut = true;
-          addLog(`⏰ ${player.name} 超時（牌池已空），之後每回合限時縮短為 20 秒。`, 'draw');
-          if (state.consecutivePasses >= state.players.length) {
-            finishGameByLowestScore();
-            broadcastGameState();
-            return;
-          }
+          addLog(`⏰ 【最後一輪】${player.name} 超時自動 Pass，之後每回合限時縮短為 20 秒。`, 'draw');
         }
-        advanceTurn();
+        advanceTurn(justTriggered);
       }
 
       function handleDrawAction(isTimeout = false) {
@@ -2974,6 +3004,7 @@
         state.hintTileIds.clear();
         state.justPlayedIds.clear();
 
+        let justTriggered = false;
         if (state.pool.length > 0) {
           const drawn = state.pool.pop();
           player.hand.push(drawn);
@@ -2983,18 +3014,28 @@
           playSound('draw');
           addLog(`🃏 ${player.name} ${isTimeout ? '超時' : ''}抽了一張牌（手牌 ${player.hand.length} 張）。`, 'draw');
           if (!isTimeout) showToast(`已抽一張牌：${formatTileLabel(drawn)}`, 'info');
+          if (state.pool.length === 0 && state.finalRoundLeft === 0) {
+            checkPoolExhaustedTrigger();
+            justTriggered = true;
+          }
         } else {
+          // Final Round rule: MUST play if a legal move exists (only allow Pass if no move or timed out)!
+          if (!isTimeout) {
+            const mustPlayMove = computeSmartMove(player, state.tableSets);
+            if (mustPlayMove) {
+              state.hintTileIds = new Set(mustPlayMove.playedIds);
+              playSound('error');
+              showToast('⚠️ 最後一輪有牌必出！藍色發光的牌可以打出，無法直接 Pass！', 'error');
+              renderAll();
+              return;
+            }
+          }
           state.consecutivePasses++;
           state.justDrawnId = null;
-          addLog(`⏭️ 牌池已空，${player.name} 跳過回合。`, 'draw');
-          showToast('牌池已空，本回合跳過', 'info');
-          if (state.consecutivePasses >= state.players.length) {
-            finishGameByLowestScore();
-            broadcastGameState();
-            return;
-          }
+          addLog(`⏭️ 【最後一輪】${player.name} ${isTimeout ? '超時' : '無牌可出'}，選擇 Pass。`, 'draw');
+          if (!isTimeout) showToast('⏭️ 最後一輪無牌可出，已 Pass 換下一位', 'info');
         }
-        advanceTurn();
+        advanceTurn(justTriggered);
       }
 
       function handleConfirmPlay() {
@@ -3164,7 +3205,7 @@
         document.getElementById('winner-subtitle').textContent =
           info.reason === 'empty'
             ? `本局結束已結算加分：勝者獲得 +${info.totalPenalty} 分！請選擇重新開始或退出`
-            : `牌池已空結算加分：手牌點數最少者獲勝！請選擇重新開始或退出`;
+            : `最後一輪結束結算加分：手牌點數最少者獲勝！請選擇重新開始或退出`;
 
         document.getElementById('scoreboard-body').innerHTML = (info.rows || []).map((r, rank) => `
           <div class="flex items-center justify-between px-4 py-3 rounded-2xl ${r.id === info.winnerId ? 'bg-amber-500/20 border border-amber-400/50' : 'bg-white/5 border border-white/10'}">
@@ -3942,7 +3983,9 @@
           banner.textContent = `🌐 第 ${state.turnNumber} 輪 · 等待 ${player.avatar} ${player.name} 出牌中...`;
           pill.classList.add('hidden');
         } else {
-          banner.textContent = `🎯 第 ${state.turnNumber} 輪 · 輪到 ${player.avatar} ${player.name}`;
+          banner.textContent = state.finalRoundLeft > 0
+            ? `🔔 最後一輪（剩 ${state.finalRoundLeft} 人）· 輪到 ${player.avatar} ${player.name}（有牌必出，無牌可 Pass）`
+            : `🎯 第 ${state.turnNumber} 輪 · 輪到 ${player.avatar} ${player.name}`;
           pill.classList.remove('hidden');
           if (player.hasIcebroken) {
             pill.textContent = '🔥 已破冰（可自由拆解桌牌）';
@@ -3993,7 +4036,9 @@
         document.getElementById('btn-return-hand').disabled = !isInteractive || !hasTableSel;
         document.getElementById('btn-clear-sel').disabled = !isInteractive || !hasSel;
         document.getElementById('btn-undo').disabled = !isInteractive;
-        document.getElementById('btn-draw').disabled = !isInteractive;
+        const drawBtn = document.getElementById('btn-draw');
+        drawBtn.disabled = !isInteractive;
+        drawBtn.textContent = state.pool.length === 0 ? '⏭️ 無牌 Pass' : '🃏 抽牌換人';
         updateAutoDrawButtonUI();
         document.getElementById('btn-confirm').disabled = !isInteractive;
         document.getElementById('btn-quick-play').disabled = !isInteractive;
