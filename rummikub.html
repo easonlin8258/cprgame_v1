@@ -205,6 +205,16 @@
       }
     }
 
+    @keyframes seatJoinPop {
+      0% { transform: scale(0.92); box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.8); }
+      50% { transform: scale(1.03); box-shadow: 0 0 0 6px rgba(52, 211, 153, 0.35); }
+      100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+    }
+
+    .seat-just-joined {
+      animation: seatJoinPop 0.75s ease-out;
+    }
+
     @keyframes drawnBounce {
       0% { transform: translateY(-22px) scale(1.1); opacity: 0.5; }
       60% { transform: translateY(3px) scale(0.98); opacity: 1; }
@@ -554,13 +564,16 @@
           <div id="online-room-box" class="hidden space-y-4 p-4 rounded-2xl bg-emerald-950/45 border border-emerald-400/35">
             <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-white/10">
               <div>
-                <div class="text-xs font-bold text-emerald-300 uppercase tracking-wider">目前聯機房間</div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-bold text-emerald-300 uppercase tracking-wider">目前聯機房間</span>
+                  <span id="lobby-member-count" class="px-2.5 py-0.5 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-200 text-xs font-extrabold">1 / 6 人</span>
+                </div>
                 <div class="flex items-center gap-2.5 mt-1">
                   <span id="lobby-room-code" class="text-2xl sm:text-3xl font-black tracking-widest text-amber-300">RM-0000</span>
                   <button id="btn-copy-room-code" type="button" class="px-3 py-1 rounded-lg bg-white/15 hover:bg-white/25 text-xs sm:text-sm font-bold text-white transition">📋 複製房號</button>
                 </div>
               </div>
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-2 flex-wrap">
                 <button id="btn-fill-bots" type="button" class="px-3.5 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-bold text-sm transition shadow">
                   🤖 空位補滿 AI
                 </button>
@@ -570,9 +583,26 @@
               </div>
             </div>
 
+            <!-- Connection warning banner (shown if joining player hasn't received host ACK yet) -->
+            <div id="online-connect-banner" class="hidden flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-amber-500/20 border border-amber-400/50 text-amber-100 text-xs sm:text-sm font-semibold">
+              <span id="online-connect-text">⏳ 正在等待房主回應...</span>
+              <button id="btn-retry-join" type="button" class="px-3 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition">🔄 重新連線</button>
+            </div>
+
             <!-- 6 Online Seats -->
             <div id="online-seats-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
               <!-- Rendered dynamically -->
+            </div>
+
+            <!-- Live Room Join / Leave Activity Feed -->
+            <div class="rounded-xl bg-slate-950/70 border border-white/10 p-3">
+              <div class="text-xs font-bold text-emerald-300 mb-1.5 flex items-center justify-between">
+                <span>📢 房間即時進出動態</span>
+                <span class="text-[11px] text-slate-400">誰進來會立即顯示在這裡</span>
+              </div>
+              <div id="online-activity-feed" class="max-h-24 overflow-y-auto space-y-1 text-xs sm:text-sm text-slate-200">
+                <!-- Rendered dynamically -->
+              </div>
             </div>
 
             <div class="flex flex-wrap items-center justify-between gap-2 pt-2 text-xs sm:text-sm text-emerald-200/85">
@@ -658,6 +688,11 @@
           <button id="btn-sync-copy-code" type="button" class="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-sm transition">
             📋 複製房號
           </button>
+        </div>
+
+        <div id="sync-roster-section" class="hidden space-y-2">
+          <div class="font-bold text-emerald-300">目前房間成員名單</div>
+          <div id="sync-roster-list" class="grid grid-cols-2 gap-2"></div>
         </div>
 
         <div class="space-y-2">
@@ -876,7 +911,11 @@
         isHost: false,
         localSeatIndex: 0,
         channel: null,
-        seats: [], // 6 seats: { occupied, isAI, clientId, name, avatar }
+        seats: [], // 6 seats: { occupied, isAI, clientId, name, avatar, joinedAt }
+        roomEvents: [], // { time, text, kind }
+        lastJoinedSeat: -1,
+        joinStatus: 'idle', // 'idle' | 'connecting' | 'connected' | 'timeout'
+        joinTimeoutHandle: null,
         chatMessages: []
       };
 
@@ -935,12 +974,29 @@
         } catch (_) {}
       }
 
+      function addRoomEvent(text, kind = 'info') {
+        const time = new Date().toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        net.roomEvents.unshift({ time, text, kind });
+        if (net.roomEvents.length > 30) net.roomEvents.pop();
+      }
+
+      function clearJoinTimeout() {
+        if (net.joinTimeoutHandle) {
+          clearTimeout(net.joinTimeoutHandle);
+          net.joinTimeoutHandle = null;
+        }
+      }
+
       function createOnlineRoom() {
+        clearJoinTimeout();
         const nick = document.getElementById('online-nickname').value.trim() || '房主';
         net.mode = 'online';
         net.roomCode = generateRoomCode();
         net.isHost = true;
         net.localSeatIndex = 0;
+        net.joinStatus = 'connected';
+        net.lastJoinedSeat = 0;
+        net.roomEvents = [];
         net.seats = SEAT_AVATARS.map((avatar, idx) => ({
           occupied: idx === 0,
           isAI: false,
@@ -949,11 +1005,25 @@
           avatar
         }));
 
+        addRoomEvent(`👑 房主「${nick}」建立了房間 ${net.roomCode}（座位 #1）`, 'join');
         openRoomChannel(net.roomCode);
         renderOnlineLobby();
         updateHeaderRoomBadge();
         playSound('select');
         showToast(`🌐 已建立房間 ${net.roomCode}！其他分頁輸入房號即可加入`, 'success');
+      }
+
+      function sendJoinRequest(code, nick) {
+        clearJoinTimeout();
+        net.joinStatus = 'connecting';
+        sendNetMessage({ type: 'JOIN_REQ', name: nick });
+        net.joinTimeoutHandle = setTimeout(() => {
+          if (net.mode === 'online' && !net.isHost && net.localSeatIndex < 0) {
+            net.joinStatus = 'timeout';
+            addRoomEvent(`⚠️ 尚未收到房間 ${code} 房主回應，請確認房主分頁已開啟且房號正確`, 'warn');
+            renderOnlineLobby();
+          }
+        }, 1500);
       }
 
       function joinOnlineRoom() {
@@ -970,6 +1040,8 @@
         net.roomCode = code;
         net.isHost = false;
         net.localSeatIndex = -1;
+        net.lastJoinedSeat = -1;
+        net.roomEvents = [];
         net.seats = SEAT_AVATARS.map((avatar) => ({
           occupied: false,
           isAI: false,
@@ -978,14 +1050,16 @@
           avatar
         }));
 
+        addRoomEvent(`🚪 你（${nick}）正在連線加入房間 ${code}...`, 'info');
         openRoomChannel(code);
-        sendNetMessage({ type: 'JOIN_REQ', name: nick });
+        sendJoinRequest(code, nick);
         renderOnlineLobby();
         updateHeaderRoomBadge();
         showToast(`正在連線至房間 ${code}...`, 'info');
       }
 
       function leaveOnlineRoom() {
+        clearJoinTimeout();
         if (net.mode === 'online') {
           sendNetMessage({ type: 'LEAVE_ROOM', seatIndex: net.localSeatIndex });
         }
@@ -994,45 +1068,76 @@
         net.roomCode = '';
         net.isHost = false;
         net.localSeatIndex = 0;
+        net.joinStatus = 'idle';
+        net.lastJoinedSeat = -1;
         net.seats = [];
+        net.roomEvents = [];
         document.getElementById('online-room-box').classList.add('hidden');
         updateHeaderRoomBadge();
       }
 
       function fillEmptySeatsWithAI() {
         if (!net.isHost) return;
+        const addedNames = [];
         net.seats.forEach((s, idx) => {
           if (!s.occupied) {
             s.occupied = true;
             s.isAI = true;
             s.clientId = null;
             s.name = DEFAULT_NAMES[idx].startsWith('AI') ? DEFAULT_NAMES[idx] : `AI-電腦${idx + 1}`;
+            addedNames.push(s.name);
           }
         });
+        if (addedNames.length > 0) {
+          addRoomEvent(`🤖 房主補入了 ${addedNames.length} 位 AI：${addedNames.join('、')}`, 'info');
+        }
         playSound('select');
         renderOnlineLobby();
-        sendNetMessage({ type: 'LOBBY_SYNC', seats: net.seats });
+        sendNetMessage({ type: 'LOBBY_SYNC', seats: net.seats, roomEvents: net.roomEvents });
       }
 
       function handleNetMessage(msg) {
         if (msg.type === 'JOIN_REQ' && net.isHost) {
-          // Find first empty seat (or replace an AI seat if game hasn't started)
-          let seatIdx = net.seats.findIndex(s => !s.occupied);
-          if (seatIdx < 0 && !state.started) {
-            seatIdx = net.seats.findIndex(s => s.isAI);
-          }
+          // If same client re-requests, reuse their seat
+          let seatIdx = net.seats.findIndex(s => s.occupied && s.clientId === msg.senderId);
+          if (seatIdx < 0) seatIdx = net.seats.findIndex(s => !s.occupied);
+          if (seatIdx < 0 && !state.started) seatIdx = net.seats.findIndex(s => s.isAI);
+
           if (seatIdx >= 0) {
+            // Avoid duplicate nicknames so everyone can tell who joined!
+            let finalName = (msg.name || '').trim() || `玩家 ${seatIdx + 1}`;
+            const dup = net.seats.some((s, i) => i !== seatIdx && s.occupied && s.name === finalName);
+            if (dup) {
+              finalName = finalName === '玩家 1' ? `玩家 ${seatIdx + 1}` : `${finalName} (#${seatIdx + 1})`;
+            }
+
             net.seats[seatIdx] = {
               occupied: true,
               isAI: false,
               clientId: msg.senderId,
-              name: msg.name || `玩家 ${seatIdx + 1}`,
+              name: finalName,
               avatar: SEAT_AVATARS[seatIdx]
             };
-            sendNetMessage({ type: 'JOIN_ACK', targetId: msg.senderId, seatIndex: seatIdx, seats: net.seats });
-            sendNetMessage({ type: 'LOBBY_SYNC', seats: net.seats });
+            net.lastJoinedSeat = seatIdx;
+            addRoomEvent(`🎉 ${SEAT_AVATARS[seatIdx]} 「${finalName}」加入了房間（座位 #${seatIdx + 1}）`, 'join');
+
+            sendNetMessage({
+              type: 'JOIN_ACK',
+              targetId: msg.senderId,
+              seatIndex: seatIdx,
+              assignedName: finalName,
+              seats: net.seats,
+              roomEvents: net.roomEvents
+            });
+            sendNetMessage({
+              type: 'LOBBY_SYNC',
+              seats: net.seats,
+              roomEvents: net.roomEvents,
+              lastJoinedSeat: seatIdx,
+              toastText: `🎉 ${SEAT_AVATARS[seatIdx]} ${finalName} 加入了座位 #${seatIdx + 1}！`
+            });
             renderOnlineLobby();
-            showToast(`🎉 ${net.seats[seatIdx].name} 加入了房間！`, 'success');
+            showToast(`🎉 ${SEAT_AVATARS[seatIdx]} ${finalName} 加入了座位 #${seatIdx + 1}！`, 'success');
             playSound('success');
             if (state.started) {
               broadcastGameState();
@@ -1041,25 +1146,41 @@
             sendNetMessage({ type: 'JOIN_FULL', targetId: msg.senderId });
           }
         } else if (msg.type === 'JOIN_ACK' && msg.targetId === CLIENT_ID) {
+          clearJoinTimeout();
           net.localSeatIndex = msg.seatIndex;
+          net.joinStatus = 'connected';
           net.seats = msg.seats;
+          net.lastJoinedSeat = msg.seatIndex;
+          if (Array.isArray(msg.roomEvents)) net.roomEvents = msg.roomEvents;
+          if (msg.assignedName) {
+            document.getElementById('online-nickname').value = msg.assignedName;
+          }
           renderOnlineLobby();
-          showToast(`✅ 成功加入房間 ${net.roomCode}（座位 #${msg.seatIndex + 1}）`, 'success');
+          updateHeaderRoomBadge();
+          showToast(`✅ 你已加入房間 ${net.roomCode}（${SEAT_AVATARS[msg.seatIndex]} 座位 #${msg.seatIndex + 1}）`, 'success');
           playSound('success');
         } else if (msg.type === 'JOIN_FULL' && msg.targetId === CLIENT_ID) {
+          clearJoinTimeout();
           showToast('此房間 6 位座位已滿！', 'error');
           leaveOnlineRoom();
         } else if (msg.type === 'LOBBY_SYNC') {
           net.seats = msg.seats;
+          if (Array.isArray(msg.roomEvents)) net.roomEvents = msg.roomEvents;
+          if (typeof msg.lastJoinedSeat === 'number') net.lastJoinedSeat = msg.lastJoinedSeat;
           renderOnlineLobby();
+          if (msg.toastText) {
+            showToast(msg.toastText, 'success');
+            playSound('select');
+          }
         } else if (msg.type === 'LEAVE_ROOM' && net.isHost) {
           const idx = msg.seatIndex;
           if (idx > 0 && idx < 6 && net.seats[idx]) {
             const leftName = net.seats[idx].name;
             net.seats[idx] = { occupied: false, isAI: false, clientId: null, name: '', avatar: SEAT_AVATARS[idx] };
+            addRoomEvent(`🚪 「${leftName}」離開了房間（座位 #${idx + 1} 已空出）`, 'warn');
             renderOnlineLobby();
-            sendNetMessage({ type: 'LOBBY_SYNC', seats: net.seats });
-            showToast(`${leftName} 離開了房間`, 'info');
+            sendNetMessage({ type: 'LOBBY_SYNC', seats: net.seats, roomEvents: net.roomEvents, toastText: `🚪 ${leftName} 離開了房間` });
+            showToast(`🚪 ${leftName} 離開了房間`, 'info');
           }
         } else if (msg.type === 'GAME_STATE') {
           applySyncedGameState(msg.payload);
@@ -1156,46 +1277,112 @@
         box.classList.remove('hidden');
         document.getElementById('lobby-room-code').textContent = net.roomCode;
 
+        const occupiedCount = net.seats.filter(s => s.occupied).length;
+        const humanCount = net.seats.filter(s => s.occupied && !s.isAI).length;
+        document.getElementById('lobby-member-count').textContent = `${occupiedCount} / 6 人（真人 ${humanCount} 位）`;
+
+        // Connection status banner for joining guests
+        const connBanner = document.getElementById('online-connect-banner');
+        const connText = document.getElementById('online-connect-text');
+        if (!net.isHost && net.localSeatIndex < 0) {
+          connBanner.classList.remove('hidden');
+          connText.textContent = net.joinStatus === 'timeout'
+            ? `⚠️ 尚未找到房間 ${net.roomCode} 的房主！請確認房主分頁已開啟且房號相同。`
+            : `⏳ 正在連線至房間 ${net.roomCode}，等待房主確認座位...`;
+        } else {
+          connBanner.classList.add('hidden');
+        }
+
         const grid = document.getElementById('online-seats-grid');
         grid.innerHTML = net.seats.map((s, idx) => {
           const isMe = idx === net.localSeatIndex;
-          const badge = !s.occupied
-            ? '<span class="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">⏳ 等待加入</span>'
-            : s.isAI
-              ? '<span class="text-xs px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-200 border border-indigo-400/40">🤖 AI 補位</span>'
-              : '<span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/30 text-emerald-200 border border-emerald-400/40">🟢 已連線</span>';
+          const isHostSeat = idx === 0 && s.occupied && !s.isAI;
+          const isFresh = idx === net.lastJoinedSeat && s.occupied;
+
+          let badge = '<span class="text-xs px-2 py-0.5 rounded-full bg-slate-700/90 text-slate-300 font-semibold">⏳ 空位等待中</span>';
+          if (s.occupied) {
+            if (s.isAI) {
+              badge = '<span class="text-xs px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-200 border border-indigo-400/40 font-bold">🤖 AI 補位</span>';
+            } else if (isHostSeat) {
+              badge = '<span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/30 text-amber-200 border border-amber-400/50 font-extrabold">👑 房主 · 線上</span>';
+            } else {
+              badge = '<span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/30 text-emerald-200 border border-emerald-400/50 font-extrabold">🟢 真人已加入</span>';
+            }
+          }
+
           return `
-            <div class="flex items-center justify-between gap-2 p-3 rounded-xl border ${
-              isMe ? 'bg-amber-500/15 border-amber-400/60' : 'bg-slate-900/80 border-white/10'
+            <div class="flex items-center justify-between gap-2 p-3 rounded-xl border-2 transition ${isFresh ? 'seat-just-joined' : ''} ${
+              isMe
+                ? 'bg-amber-500/20 border-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.25)]'
+                : s.occupied
+                  ? 'bg-emerald-900/35 border-emerald-400/40'
+                  : 'bg-slate-900/75 border-dashed border-white/15 opacity-75'
             }">
-              <div class="flex items-center gap-2 min-w-0">
-                <span class="text-2xl">${s.avatar}</span>
+              <div class="flex items-center gap-2.5 min-w-0">
+                <span class="text-2xl shrink-0">${s.avatar}</span>
                 <div class="min-w-0">
-                  <div class="text-sm font-bold text-white truncate">${s.occupied ? escapeHtml(s.name) : `座位 ${idx + 1}`} ${isMe ? '(你)' : ''}</div>
-                  <div class="mt-0.5">${badge}</div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-[11px] font-black px-1.5 py-0.2 rounded bg-black/40 text-slate-300">#${idx + 1}</span>
+                    <span class="text-sm sm:text-base font-extrabold text-white truncate">${s.occupied ? escapeHtml(s.name) : '等待玩家加入...'}</span>
+                    ${isMe ? '<span class="text-[11px] px-1.5 rounded bg-amber-400 text-slate-950 font-black shrink-0">你</span>' : ''}
+                  </div>
+                  <div class="mt-1">${badge}</div>
                 </div>
               </div>
             </div>
           `;
         }).join('');
 
+        // Render live join/leave activity feed
+        const feed = document.getElementById('online-activity-feed');
+        if (net.roomEvents.length === 0) {
+          feed.innerHTML = '<div class="text-slate-400 text-xs">尚無進出動態</div>';
+        } else {
+          feed.innerHTML = net.roomEvents.map(ev => {
+            const cls = ev.kind === 'join' ? 'text-emerald-300 font-bold' : ev.kind === 'warn' ? 'text-amber-300 font-semibold' : 'text-slate-200';
+            return `<div class="${cls}"><span class="text-[11px] text-slate-400 mr-1.5 tabular-nums">[${ev.time}]</span>${escapeHtml(ev.text)}</div>`;
+          }).join('');
+        }
+
         document.getElementById('btn-fill-bots').classList.toggle('hidden', !net.isHost);
         document.getElementById('btn-online-start').classList.toggle('hidden', !net.isHost);
         document.getElementById('online-lobby-hint').textContent = net.isHost
           ? '💡 在同瀏覽器開新分頁輸入上方房號即可即時加入，或按「空位補滿 AI」立即開局！'
-          : '⏳ 已進入房間，請等待房主開始六人對局...';
+          : (net.localSeatIndex >= 0
+              ? `✅ 你在座位 #${net.localSeatIndex + 1}，已看到所有房間成員，等待房主按下開始對局...`
+              : '⏳ 正在連線中...');
       }
 
       function updateHeaderRoomBadge() {
         const badge = document.getElementById('room-code-badge');
         const info = document.getElementById('sync-room-info');
+        const rosterSec = document.getElementById('sync-roster-section');
+        const rosterList = document.getElementById('sync-roster-list');
+
         if (net.mode === 'online' && net.roomCode) {
           badge.classList.remove('hidden');
           document.getElementById('header-room-code').textContent = net.roomCode;
-          info.textContent = `多人聯機房間 · ${net.roomCode}（${net.isHost ? '房主' : '房客'}）`;
+          const mySeat = net.localSeatIndex >= 0 ? `座位 #${net.localSeatIndex + 1}` : '連線中';
+          info.textContent = `多人聯機房間 · ${net.roomCode}（${net.isHost ? '👑 房主' : '🟢 房客'} · ${mySeat}）`;
+
+          rosterSec.classList.remove('hidden');
+          rosterList.innerHTML = net.seats.map((s, idx) => {
+            const isMe = idx === net.localSeatIndex;
+            const role = !s.occupied ? '⏳ 空位' : s.isAI ? '🤖 AI' : (idx === 0 ? '👑 房主' : '🟢 線上');
+            return `
+              <div class="flex items-center justify-between px-2.5 py-2 rounded-xl border ${isMe ? 'bg-amber-500/20 border-amber-400/60' : 'bg-slate-800/80 border-white/10'}">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <span>${s.avatar}</span>
+                  <span class="text-xs font-bold text-white truncate">#${idx + 1} ${s.occupied ? escapeHtml(s.name) : '等待中'}${isMe ? ' (你)' : ''}</span>
+                </div>
+                <span class="text-[11px] text-emerald-300 font-semibold shrink-0">${role}</span>
+              </div>
+            `;
+          }).join('');
         } else {
           badge.classList.add('hidden');
           info.textContent = '單機 / 同機聚會模式';
+          rosterSec.classList.add('hidden');
         }
       }
 
@@ -2881,6 +3068,14 @@
 
         document.getElementById('btn-create-room').addEventListener('click', createOnlineRoom);
         document.getElementById('btn-join-room').addEventListener('click', joinOnlineRoom);
+        document.getElementById('btn-retry-join').addEventListener('click', () => {
+          if (net.roomCode) {
+            const nick = document.getElementById('online-nickname').value.trim() || '玩家';
+            sendJoinRequest(net.roomCode, nick);
+            renderOnlineLobby();
+            showToast(`正在重新連線至房間 ${net.roomCode}...`, 'info');
+          }
+        });
         document.getElementById('btn-copy-room-code').addEventListener('click', () => {
           if (net.roomCode) copyTextSafe(net.roomCode, `已複製房號 ${net.roomCode}`);
         });
