@@ -1,0 +1,2178 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>六人拉米 Rummikub — 多人桌遊</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --felt-center: #14533e;
+      --felt-edge: #0a291f;
+      --wood-light: #6d4c3d;
+      --wood-dark: #3b241a;
+      --tile-bg: #fdfaf2;
+      --tile-edge: #cfc6b2;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: 'Inter', 'Noto Sans TC', system-ui, -apple-system, sans-serif;
+      background: radial-gradient(circle at 50% 35%, var(--felt-center) 0%, var(--felt-edge) 100%);
+      color: #f8fafc;
+      margin: 0;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Subtle felt texture overlay */
+    .felt-bg {
+      background-image:
+        radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 0),
+        radial-gradient(circle at 50% 35%, #165b44 0%, #09241b 100%);
+      background-size: 16px 16px, 100% 100%;
+    }
+
+    /* Wooden tile rack */
+    .wood-rack {
+      background: linear-gradient(180deg, #5c3c2e 0%, #462c21 55%, #341f16 100%);
+      box-shadow:
+        inset 0 2px 4px rgba(255, 255, 255, 0.14),
+        inset 0 -4px 8px rgba(0, 0, 0, 0.55),
+        0 -6px 20px rgba(0, 0, 0, 0.45);
+      border-top: 2px solid #7d5644;
+    }
+
+    .rack-groove {
+      background: rgba(20, 10, 5, 0.35);
+      box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Authentic 3D Rummikub Tile */
+    .rummi-tile {
+      position: relative;
+      width: 44px;
+      height: 60px;
+      border-radius: 7px;
+      background: linear-gradient(180deg, #fffdf8 0%, #f5efe1 100%);
+      border: 1px solid #dfd6c3;
+      box-shadow:
+        0 4px 0 var(--tile-edge),
+        0 6px 8px rgba(0, 0, 0, 0.32),
+        inset 0 1px 0 rgba(255, 255, 255, 0.9);
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.14s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.14s ease, outline 0.12s ease;
+      flex-shrink: 0;
+    }
+
+    .rummi-tile.tile-sm {
+      width: 38px;
+      height: 52px;
+      border-radius: 6px;
+      box-shadow:
+        0 3px 0 var(--tile-edge),
+        0 4px 6px rgba(0, 0, 0, 0.28),
+        inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    }
+
+    .rummi-tile::after {
+      content: '';
+      position: absolute;
+      inset: 4px;
+      border-radius: 4px;
+      border: 1px solid rgba(180, 165, 138, 0.28);
+      pointer-events: none;
+    }
+
+    .rummi-tile:hover {
+      transform: translateY(-3px);
+      box-shadow:
+        0 6px 0 var(--tile-edge),
+        0 9px 14px rgba(0, 0, 0, 0.38),
+        inset 0 1px 0 rgba(255, 255, 255, 0.95);
+    }
+
+    .rummi-tile.selected {
+      transform: translateY(-9px) scale(1.04);
+      box-shadow:
+        0 4px 0 #d97706,
+        0 0 0 2.5px #fbbf24,
+        0 12px 18px rgba(251, 191, 36, 0.38);
+      z-index: 10;
+    }
+
+    .rummi-tile.hint-glow {
+      animation: hintPulse 1.1s ease-in-out infinite;
+    }
+
+    .rummi-tile.just-played {
+      box-shadow:
+        0 3px 0 #65a30d,
+        0 0 0 2px #a3e635,
+        0 6px 12px rgba(163, 230, 53, 0.35);
+    }
+
+    .rummi-tile.just-drawn {
+      animation: drawnBounce 0.65s ease-out;
+      box-shadow:
+        0 4px 0 #0284c7,
+        0 0 0 2.5px #38bdf8,
+        0 8px 14px rgba(56, 189, 248, 0.4);
+    }
+
+    .rummi-tile.dragging {
+      opacity: 0.45;
+      transform: scale(0.95);
+    }
+
+    @keyframes hintPulse {
+      0%, 100% {
+        box-shadow: 0 4px 0 #0284c7, 0 0 0 2.5px #38bdf8, 0 0 14px rgba(56, 189, 248, 0.65);
+        transform: translateY(-4px);
+      }
+      50% {
+        box-shadow: 0 4px 0 #0369a1, 0 0 0 3.5px #7dd3fc, 0 0 22px rgba(125, 211, 252, 0.9);
+        transform: translateY(-8px);
+      }
+    }
+
+    @keyframes drawnBounce {
+      0% { transform: translateY(-20px) scale(1.1); opacity: 0.5; }
+      60% { transform: translateY(2px) scale(0.98); opacity: 1; }
+      100% { transform: translateY(0) scale(1); opacity: 1; }
+    }
+
+    .tile-num {
+      font-weight: 800;
+      font-size: 1.3rem;
+      line-height: 1;
+      letter-spacing: -0.04em;
+      z-index: 1;
+    }
+
+    .tile-sm .tile-num {
+      font-size: 1.12rem;
+    }
+
+    .tile-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 9999px;
+      margin-top: 3px;
+      opacity: 0.72;
+      z-index: 1;
+    }
+
+    .color-red { color: #dc2626; }
+    .dot-red { background-color: #dc2626; }
+    .color-blue { color: #1d4ed8; }
+    .dot-blue { background-color: #1d4ed8; }
+    .color-orange { color: #d97706; }
+    .dot-orange { background-color: #d97706; }
+    .color-black { color: #18181b; }
+    .dot-black { background-color: #18181b; }
+
+    /* Table Set Group */
+    .table-set {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 6px 8px 9px 8px;
+      border-radius: 11px;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1.5px solid rgba(255, 255, 255, 0.12);
+      transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
+    }
+
+    .table-set:hover {
+      background: rgba(0, 0, 0, 0.28);
+      border-color: rgba(255, 255, 255, 0.28);
+    }
+
+    .table-set.drop-target {
+      border-color: #fbbf24;
+      background: rgba(251, 191, 36, 0.14);
+      transform: scale(1.02);
+    }
+
+    .table-set.invalid-set {
+      border-color: #f87171;
+      background: rgba(220, 38, 38, 0.2);
+      box-shadow: 0 0 12px rgba(248, 113, 113, 0.3);
+    }
+
+    .table-set.new-turn-set {
+      border-color: rgba(163, 230, 53, 0.55);
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.22);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.38);
+    }
+
+    @media (max-width: 640px) {
+      .rummi-tile {
+        width: 36px;
+        height: 50px;
+      }
+      .tile-num {
+        font-size: 1.08rem;
+      }
+      .rummi-tile.tile-sm {
+        width: 32px;
+        height: 44px;
+      }
+      .tile-sm .tile-num {
+        font-size: 0.98rem;
+      }
+    }
+  </style>
+</head>
+<body class="felt-bg flex flex-col h-screen overflow-hidden">
+
+  <!-- Top Header Bar -->
+  <header class="flex items-center justify-between px-3 sm:px-5 py-2 bg-black/35 border-b border-white/10 backdrop-blur-sm shrink-0 gap-2">
+    <div class="flex items-center gap-2.5 min-w-0">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center shadow-md font-black text-slate-950 text-base shrink-0">
+        拉
+      </div>
+      <div class="min-w-0">
+        <h1 class="text-sm sm:text-base font-extrabold tracking-tight text-amber-100 truncate">六人拉米 Rummikub</h1>
+        <p class="text-[11px] text-emerald-200/75 hidden sm:block">160 張六人加量牌組 · 破冰 30 分 · 支援同機多人與 AI 對戰</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+      <!-- Pool Counter -->
+      <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/80 border border-emerald-400/25 text-xs font-semibold text-emerald-100" title="牌池剩餘張數">
+        <span class="text-amber-300">🃏</span>
+        <span>牌池 <strong id="pool-count" class="text-white">76</strong></span>
+      </div>
+
+      <!-- Turn Timer -->
+      <div id="timer-badge" class="flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/40 border border-white/15 text-xs font-bold tabular-nums text-amber-200">
+        <span>⏱</span>
+        <span id="timer-display">90s</span>
+      </div>
+
+      <!-- Sound Toggle -->
+      <button id="btn-sound" type="button" class="p-1.5 sm:px-2.5 sm:py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-medium text-white transition" title="切換音效">
+        <span id="sound-icon">🔊</span>
+      </button>
+
+      <!-- Log Toggle -->
+      <button id="btn-toggle-log" type="button" class="px-2 sm:px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-medium text-white transition flex items-center gap-1">
+        <span>📜</span><span class="hidden md:inline">紀錄</span>
+      </button>
+
+      <!-- Rules Button -->
+      <button id="btn-rules" type="button" class="px-2 sm:px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-medium text-white transition flex items-center gap-1">
+        <span>📖</span><span class="hidden md:inline">規則</span>
+      </button>
+
+      <!-- New Game / Setup Button -->
+      <button id="btn-setup" type="button" class="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow transition">
+        ⚙️ 開新局
+      </button>
+    </div>
+  </header>
+
+  <!-- 6-Player Seat Strip -->
+  <section id="players-bar" class="grid grid-cols-3 lg:grid-cols-6 gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 bg-black/20 border-b border-white/10 shrink-0">
+    <!-- Rendered dynamically -->
+  </section>
+
+  <!-- Main Table Area -->
+  <main class="relative flex-1 flex flex-col min-h-0 overflow-hidden">
+    <!-- Status & Quick Table Toolbar -->
+    <div class="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-5 py-1.5 bg-black/15 border-b border-white/5 text-xs shrink-0">
+      <div class="flex items-center gap-2 min-w-0">
+        <span id="turn-banner" class="font-bold text-amber-300 truncate">準備開始六人拉米</span>
+        <span id="icebreak-status-pill" class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sky-500/20 text-sky-200 border border-sky-400/30 hidden"></span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <button id="btn-new-set" type="button" class="px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold transition shadow-sm">
+          ＋ 放成新牌組
+        </button>
+        <button id="btn-return-hand" type="button" class="px-2.5 py-1 rounded-md bg-slate-700 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold transition shadow-sm">
+          ⤵ 收回手牌
+        </button>
+        <button id="btn-clear-sel" type="button" class="px-2 py-1 rounded-md bg-white/10 hover:bg-white/20 disabled:opacity-40 text-emerald-100 transition">
+          取消選取
+        </button>
+      </div>
+    </div>
+
+    <!-- Scrollable Table Canvas -->
+    <div id="table-area" class="flex-1 overflow-y-auto p-3 sm:p-5 flex flex-wrap content-start items-start gap-3 sm:gap-4 transition-colors">
+      <!-- Sets rendered here -->
+    </div>
+
+    <!-- Floating Toast Notification -->
+    <div id="toast-container" class="pointer-events-none fixed top-16 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 w-11/12 max-w-md"></div>
+
+    <!-- Slide-over Action Log Drawer -->
+    <aside id="log-drawer" class="hidden absolute top-0 right-0 bottom-0 w-72 max-w-[85vw] bg-slate-950/95 border-l border-white/15 backdrop-blur-md z-30 flex flex-col shadow-2xl">
+      <div class="flex items-center justify-between px-3.5 py-2.5 border-b border-white/10">
+        <h2 class="text-sm font-bold text-amber-200">📜 對局動態紀錄</h2>
+        <button id="btn-close-log" type="button" class="text-slate-400 hover:text-white text-lg leading-none px-1">&times;</button>
+      </div>
+      <div id="log-list" class="flex-1 overflow-y-auto p-3 space-y-2 text-xs"></div>
+    </aside>
+  </main>
+
+  <!-- Player Action Bar & Wooden Hand Rack -->
+  <footer class="wood-rack shrink-0 px-3 sm:px-5 pt-2 pb-3">
+    <!-- Action Controls -->
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+      <div class="flex items-center gap-1.5 flex-wrap">
+        <span id="hand-owner-label" class="text-xs sm:text-sm font-bold text-amber-100 mr-1">玩家 1 的手牌 (14)</span>
+        <button id="btn-sort-num" type="button" class="px-2.5 py-1 rounded-md bg-black/35 hover:bg-black/50 border border-amber-200/20 text-xs font-medium text-amber-100 transition">
+          🔢 數字排序
+        </button>
+        <button id="btn-sort-color" type="button" class="px-2.5 py-1 rounded-md bg-black/35 hover:bg-black/50 border border-amber-200/20 text-xs font-medium text-amber-100 transition">
+          🎨 顏色排序
+        </button>
+        <button id="btn-hint" type="button" class="px-2.5 py-1 rounded-md bg-sky-600/80 hover:bg-sky-500 border border-sky-300/30 text-xs font-semibold text-white transition">
+          💡 提示
+        </button>
+      </div>
+
+      <div class="flex items-center gap-1.5 sm:gap-2">
+        <button id="btn-undo" type="button" class="px-3 py-1.5 rounded-lg bg-stone-700 hover:bg-stone-600 disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-semibold text-stone-100 shadow transition">
+          ↩️ 還原
+        </button>
+        <button id="btn-draw" type="button" class="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-bold text-white shadow transition">
+          🃏 抽牌換人
+        </button>
+        <button id="btn-confirm" type="button" class="px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-xs sm:text-sm font-extrabold text-slate-950 shadow-md transition">
+          ✅ 確認出牌
+        </button>
+      </div>
+    </div>
+
+    <!-- Wooden Rack Tile Container -->
+    <div id="hand-rack" class="rack-groove rounded-xl p-2 sm:p-2.5 min-h-[76px] max-h-[146px] overflow-y-auto flex flex-wrap items-center gap-1.5 sm:gap-2">
+      <!-- Hand tiles rendered here -->
+    </div>
+  </footer>
+
+  <!-- Setup / Lobby Modal -->
+  <div id="modal-setup" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3">
+    <div class="bg-slate-900 border border-emerald-500/30 rounded-2xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="px-5 py-4 bg-gradient-to-r from-emerald-950 to-slate-900 border-b border-white/10 flex items-center justify-between">
+        <div>
+          <h2 class="text-lg sm:text-xl font-extrabold text-amber-300">六人拉米 Rummikub 對局設定</h2>
+          <p class="text-xs text-slate-300 mt-0.5">採用 160 張六人加量版牌組（三副 1–13 四色 + 4 張百搭鬼牌）</p>
+        </div>
+        <button id="btn-close-setup" type="button" class="text-slate-400 hover:text-white text-2xl leading-none px-1 hidden">&times;</button>
+      </div>
+
+      <div class="p-5 overflow-y-auto space-y-4">
+        <!-- Quick Presets -->
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-xs font-semibold text-slate-400">快速預設：</span>
+          <button type="button" data-preset="1h5a" class="preset-btn px-3 py-1 rounded-full text-xs font-semibold bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-400/40 text-emerald-100 transition">1 人類 + 5 AI</button>
+          <button type="button" data-preset="6h" class="preset-btn px-3 py-1 rounded-full text-xs font-semibold bg-amber-600/30 hover:bg-amber-600/50 border border-amber-400/40 text-amber-100 transition">6 人同機聚會</button>
+          <button type="button" data-preset="2h4a" class="preset-btn px-3 py-1 rounded-full text-xs font-semibold bg-sky-600/30 hover:bg-sky-600/50 border border-sky-400/40 text-sky-100 transition">2 人類 + 4 AI</button>
+          <button type="button" data-preset="3h3a" class="preset-btn px-3 py-1 rounded-full text-xs font-semibold bg-purple-600/30 hover:bg-purple-600/50 border border-purple-400/40 text-purple-100 transition">3 人類 + 3 AI</button>
+        </div>
+
+        <!-- 6 Player Seats Grid -->
+        <div id="setup-seats" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <!-- Generated dynamically -->
+        </div>
+
+        <!-- Game Options -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-white/10">
+          <label class="block">
+            <span class="text-xs font-semibold text-slate-300">破冰門檻</span>
+            <select id="opt-icebreak" class="mt-1 w-full rounded-lg bg-slate-800 border border-white/15 px-3 py-1.5 text-sm text-white focus:outline-none focus:border-amber-400">
+              <option value="30" selected>標準 30 分破冰</option>
+              <option value="0">快速模式（免破冰）</option>
+            </select>
+          </label>
+          <label class="block">
+            <span class="text-xs font-semibold text-slate-300">每回合限時</span>
+            <select id="opt-timer" class="mt-1 w-full rounded-lg bg-slate-800 border border-white/15 px-3 py-1.5 text-sm text-white focus:outline-none focus:border-amber-400">
+              <option value="60">60 秒</option>
+              <option value="90" selected>90 秒</option>
+              <option value="120">120 秒</option>
+              <option value="0">不限時</option>
+            </select>
+          </label>
+          <label class="block">
+            <span class="text-xs font-semibold text-slate-300">AI 思考速度</span>
+            <select id="opt-ai-speed" class="mt-1 w-full rounded-lg bg-slate-800 border border-white/15 px-3 py-1.5 text-sm text-white focus:outline-none focus:border-amber-400">
+              <option value="750" selected>標準節奏</option>
+              <option value="350">極速節奏</option>
+              <option value="1300">慢速觀戰</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="px-5 py-3.5 bg-slate-950/70 border-t border-white/10 flex items-center justify-end gap-3">
+        <button id="btn-start-game" type="button" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-slate-950 font-extrabold text-sm shadow-lg transition">
+          🎮 開始六人拉米！
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pass-and-Play Privacy Overlay (when 2+ Human players) -->
+  <div id="modal-pass" class="hidden fixed inset-0 z-40 bg-emerald-950/95 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-amber-400/40 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl">
+      <div class="w-14 h-14 mx-auto rounded-full bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-3xl mb-3">
+        🙈
+      </div>
+      <h3 class="text-lg font-extrabold text-amber-200">換手防偷看畫面</h3>
+      <p id="pass-player-text" class="text-sm text-slate-300 mt-2">請將裝置交給 <strong class="text-white">玩家 2</strong></p>
+      <button id="btn-pass-ready" type="button" class="mt-5 w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-sm shadow-lg transition">
+        我準備好了，顯示手牌
+      </button>
+    </div>
+  </div>
+
+  <!-- Rules Modal -->
+  <div id="modal-rules" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3">
+    <div class="bg-slate-900 border border-white/15 rounded-2xl max-w-lg w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="px-5 py-3.5 bg-slate-950/80 border-b border-white/10 flex items-center justify-between">
+        <h2 class="text-base font-extrabold text-amber-300">📖 六人拉米 Rummikub 玩法說明</h2>
+        <button id="btn-close-rules" type="button" class="text-slate-400 hover:text-white text-2xl leading-none px-1">&times;</button>
+      </div>
+      <div class="p-5 overflow-y-auto space-y-3 text-xs sm:text-sm text-slate-200 leading-relaxed">
+        <div>
+          <h3 class="font-bold text-emerald-300 mb-1">1. 六人加量牌組（160 張）</h3>
+          <p>紅、藍、橘、黑四色 1–13 各三副（156 張）加上 4 張百搭鬼牌（Joker）。每位玩家開局發 14 張牌，最快出完手牌者獲勝！</p>
+        </div>
+        <div>
+          <h3 class="font-bold text-emerald-300 mb-1">2. 合法牌組（每組至少 3 張）</h3>
+          <ul class="list-disc pl-5 space-y-1">
+            <li><strong>順子（Run）</strong>：同顏色、數字連續（如 紅4-紅5-紅6），不可 13 接 1。</li>
+            <li><strong>群組（Group）</strong>：同數字、顏色皆不同（3 或 4 張，如 紅7-藍7-黑7）。</li>
+            <li><strong>百搭鬼牌（Joker）</strong>：可替代任何數字與顏色。</li>
+          </ul>
+        </div>
+        <div>
+          <h3 class="font-bold text-emerald-300 mb-1">3. 破冰規則（30 分）</h3>
+          <p>首次出牌只能使用自己手牌組成一組或多組牌，點數總和須達 <strong>30 分以上</strong>（鬼牌依所代表數字計分）。破冰成功後，往後回合即可自由拆解、重組桌面上的任何牌組！</p>
+        </div>
+        <div>
+          <h3 class="font-bold text-emerald-300 mb-1">4. 操作方式（點擊或拖曳皆可）</h3>
+          <ul class="list-disc pl-5 space-y-1">
+            <li><strong>點擊選牌</strong>：點選 1 張或多張手牌（已破冰亦可點選桌牌），再點<strong>「＋ 放成新牌組」</strong>或點選桌面任一牌組加入。</li>
+            <li><strong>拖曳放牌</strong>：直接將牌拖曳到桌面空白處（建立新組）或現有牌組上。</li>
+            <li><strong>出牌 / 抽牌</strong>：排好後按<strong>「✅ 確認出牌」</strong>；若無牌可出按<strong>「🃏 抽牌換人」</strong>抽一張牌。</li>
+          </ul>
+        </div>
+      </div>
+      <div class="px-5 py-3 bg-slate-950/70 border-t border-white/10 text-right">
+        <button id="btn-ok-rules" type="button" class="px-5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs">了解了</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Over / Scoreboard Modal -->
+  <div id="modal-gameover" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3">
+    <div class="bg-slate-900 border border-amber-400/40 rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="px-5 py-4 bg-gradient-to-r from-amber-500/20 to-emerald-900/40 border-b border-white/10 text-center">
+        <div class="text-4xl mb-1">🏆</div>
+        <h2 id="winner-title" class="text-xl font-black text-amber-300">玩家 1 獲勝！</h2>
+        <p id="winner-subtitle" class="text-xs text-slate-300 mt-1">率先清空手牌，贏得本局勝利</p>
+      </div>
+      <div id="scoreboard-body" class="p-4 overflow-y-auto space-y-2">
+        <!-- Rendered dynamically -->
+      </div>
+      <div class="px-5 py-3.5 bg-slate-950/80 border-t border-white/10 flex items-center justify-center gap-3">
+        <button id="btn-rematch" type="button" class="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-sm shadow transition">
+          🔄 原班人馬再一局
+        </button>
+        <button id="btn-gameover-setup" type="button" class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm transition">
+          ⚙️ 重新設定玩家
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      // ============================================================
+      // 1. Audio Synthesizer (Web Audio API - No external files)
+      // ============================================================
+      let audioCtx = null;
+      let soundEnabled = true;
+
+      function ensureAudio() {
+        if (!soundEnabled) return null;
+        if (!audioCtx) {
+          const Ctx = window.AudioContext || window.webkitAudioContext;
+          if (Ctx) audioCtx = new Ctx();
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+          audioCtx.resume().catch(() => {});
+        }
+        return audioCtx;
+      }
+
+      function playSound(type) {
+        const ctx = ensureAudio();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+
+        if (type === 'clack') {
+          // Crisp acrylic tile clack
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(680, now);
+          osc.frequency.exponentialRampToValueAtTime(190, now + 0.055);
+          gain.gain.setValueAtTime(0.18, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.065);
+        } else if (type === 'select') {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(520, now);
+          osc.frequency.exponentialRampToValueAtTime(760, now + 0.045);
+          gain.gain.setValueAtTime(0.09, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.055);
+        } else if (type === 'draw') {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(340, now);
+          osc.frequency.exponentialRampToValueAtTime(240, now + 0.09);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.11);
+        } else if (type === 'error') {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(190, now);
+          osc.frequency.setValueAtTime(150, now + 0.09);
+          gain.gain.setValueAtTime(0.09, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.23);
+        } else if (type === 'success' || type === 'win') {
+          const notes = type === 'win' ? [523.25, 659.25, 783.99, 1046.5] : [523.25, 659.25, 783.99];
+          notes.forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            const t = now + idx * 0.08;
+            osc.frequency.setValueAtTime(freq, t);
+            gain.gain.setValueAtTime(0.14, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.26);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(t);
+            osc.stop(t + 0.28);
+          });
+        }
+      }
+
+      // ============================================================
+      // 2. Constants & Game State
+      // ============================================================
+      const COLORS = ['red', 'blue', 'orange', 'black'];
+      const COLOR_ORDER = { red: 0, blue: 1, orange: 2, black: 3 };
+      const DEFAULT_NAMES = ['玩家 1', 'AI-小美', 'AI-阿明', 'AI-大華', 'AI-小雅', 'AI-凱文'];
+      const SEAT_AVATARS = ['🦁', '🦊', '🐼', '🐨', '🐯', '🦉'];
+
+      let setupConfig = {
+        players: DEFAULT_NAMES.map((name, i) => ({
+          name,
+          isAI: i > 0,
+          avatar: SEAT_AVATARS[i]
+        })),
+        icebreakMin: 30,
+        turnSeconds: 90,
+        aiDelayMs: 750
+      };
+
+      let state = {
+        started: false,
+        gameOver: false,
+        pool: [],
+        players: [],
+        tableSets: [], // Array of { id, tiles: Tile[] }
+        currentPlayerIndex: 0,
+        turnNumber: 1,
+        consecutivePasses: 0,
+        // Turn snapshot for undo & validation
+        turnSnapshot: null, // { tableSets, hand, tableTileIds }
+        // Selection state: array of { tileId, source: 'hand' | 'table', setId?: string }
+        selected: [],
+        hintTileIds: new Set(),
+        justPlayedIds: new Set(),
+        justDrawnId: null,
+        waitingPass: false,
+        logs: [],
+        nextSetUid: 1,
+        timerRemaining: 90,
+        timerHandle: null,
+        aiTimeoutHandle: null
+      };
+
+      // ============================================================
+      // 3. Tile Deck Creation & Validation Engine
+      // ============================================================
+      function create6PlayerDeck() {
+        const deck = [];
+        let uid = 1;
+        // 3 full sets of 1-13 in 4 colors = 156 tiles
+        for (let copy = 0; copy < 3; copy++) {
+          for (const color of COLORS) {
+            for (let num = 1; num <= 13; num++) {
+              deck.push({ id: `t_${uid++}`, color, num, isJoker: false });
+            }
+          }
+        }
+        // 4 Jokers (2 red, 2 black) = 160 tiles total
+        for (let j = 0; j < 4; j++) {
+          deck.push({
+            id: `j_${uid++}`,
+            color: j < 2 ? 'red' : 'black',
+            num: 0,
+            isJoker: true
+          });
+        }
+        // Fisher-Yates shuffle
+        for (let i = deck.length - 1; i > 0; i--) {
+          const k = Math.floor(Math.random() * (i + 1));
+          [deck[i], deck[k]] = [deck[k], deck[i]];
+        }
+        return deck;
+      }
+
+      /**
+       * Validates a Rummikub set (Run or Group) with full Joker support.
+       * Returns { valid, type, points, orderedTiles, reason }
+       */
+      function validateSet(tiles) {
+        if (!tiles || tiles.length < 3) {
+          return { valid: false, type: null, points: 0, orderedTiles: tiles || [], reason: '每組至少需要 3 張牌' };
+        }
+
+        const jokers = tiles.filter(t => t.isJoker);
+        const normals = tiles.filter(t => !t.isJoker);
+
+        // Edge case: all jokers (3+ jokers) -> valid as group of 13 or run of 11-12-13
+        if (normals.length === 0) {
+          if (tiles.length <= 4) {
+            return { valid: true, type: 'group', points: tiles.length * 13, orderedTiles: [...tiles], reason: '' };
+          }
+          const pts = tiles.reduce((sum, _, idx) => sum + (13 - idx), 0);
+          return { valid: true, type: 'run', points: pts, orderedTiles: [...tiles], reason: '' };
+        }
+
+        // Check Group: 3 or 4 tiles, same number, all distinct colors
+        if (tiles.length <= 4) {
+          const targetNum = normals[0].num;
+          const sameNum = normals.every(t => t.num === targetNum);
+          const uniqueColors = new Set(normals.map(t => t.color));
+          if (sameNum && uniqueColors.size === normals.length) {
+            const ordered = [
+              ...normals.slice().sort((a, b) => COLOR_ORDER[a.color] - COLOR_ORDER[b.color]),
+              ...jokers
+            ];
+            return {
+              valid: true,
+              type: 'group',
+              points: targetNum * tiles.length,
+              orderedTiles: ordered,
+              reason: ''
+            };
+          }
+        }
+
+        // Check Run: 3 to 13 tiles, same color, consecutive numbers within 1..13
+        if (tiles.length <= 13) {
+          const targetColor = normals[0].color;
+          const sameColor = normals.every(t => t.color === targetColor);
+          if (sameColor) {
+            const sortedNormals = normals.slice().sort((a, b) => a.num - b.num);
+            let hasDup = false;
+            let gapsNeeded = 0;
+            for (let i = 1; i < sortedNormals.length; i++) {
+              const diff = sortedNormals[i].num - sortedNormals[i - 1].num;
+              if (diff === 0) {
+                hasDup = true;
+                break;
+              }
+              gapsNeeded += (diff - 1);
+            }
+
+            if (!hasDup && gapsNeeded <= jokers.length) {
+              const extraJokers = jokers.length - gapsNeeded;
+              const minNum = sortedNormals[0].num;
+              const maxNum = sortedNormals[sortedNormals.length - 1].num;
+              // Maximize points by putting extra jokers on the high end first (up to 13), rest on low end (down to 1)
+              const highAdd = Math.min(extraJokers, 13 - maxNum);
+              const lowAdd = extraJokers - highAdd;
+              const startNum = minNum - lowAdd;
+              const endNum = maxNum + highAdd;
+
+              if (startNum >= 1 && endNum <= 13) {
+                const ordered = [];
+                let jIdx = 0;
+                for (let k = 0; k < lowAdd; k++) ordered.push(jokers[jIdx++]);
+                for (let i = 0; i < sortedNormals.length; i++) {
+                  ordered.push(sortedNormals[i]);
+                  if (i < sortedNormals.length - 1) {
+                    const gap = sortedNormals[i + 1].num - sortedNormals[i].num - 1;
+                    for (let g = 0; g < gap; g++) ordered.push(jokers[jIdx++]);
+                  }
+                }
+                for (let k = 0; k < highAdd; k++) ordered.push(jokers[jIdx++]);
+
+                // Sum of arithmetic progression startNum..endNum
+                const points = ((startNum + endNum) * (endNum - startNum + 1)) / 2;
+                return {
+                  valid: true,
+                  type: 'run',
+                  points,
+                  orderedTiles: ordered,
+                  reason: ''
+                };
+              }
+            }
+          }
+        }
+
+        return {
+          valid: false,
+          type: null,
+          points: 0,
+          orderedTiles: tiles,
+          reason: '非合法順子（同色連號）或群組（同數異色）'
+        };
+      }
+
+      // ============================================================
+      // 4. Smart AI & Hint Solver
+      // ============================================================
+      function findPureHandCandidates(hand) {
+        const candidates = [];
+        const normals = hand.filter(t => !t.isJoker);
+        const jokers = hand.filter(t => t.isJoker);
+
+        // 1) Groups (3 or 4 tiles of same number, distinct colors)
+        for (let num = 1; num <= 13; num++) {
+          const byColor = {};
+          for (const t of normals) {
+            if (t.num === num && !byColor[t.color]) {
+              byColor[t.color] = t;
+            }
+          }
+          const avail = Object.values(byColor);
+          if (avail.length >= 3) {
+            // 3-tile groups
+            if (avail.length === 4) {
+              candidates.push({ tiles: avail, points: num * 4, type: 'group' });
+              for (let skip = 0; skip < 4; skip++) {
+                const sub = avail.filter((_, idx) => idx !== skip);
+                candidates.push({ tiles: sub, points: num * 3, type: 'group' });
+              }
+            } else {
+              candidates.push({ tiles: avail, points: num * 3, type: 'group' });
+            }
+          }
+          // 2 tiles + 1 joker
+          if (avail.length === 2 && jokers.length >= 1) {
+            candidates.push({ tiles: [...avail, jokers[0]], points: num * 3, type: 'group' });
+          }
+        }
+
+        // 2) Runs (same color consecutive)
+        for (const color of COLORS) {
+          const byNum = new Array(14).fill(null);
+          for (const t of normals) {
+            if (t.color === color && !byNum[t.num]) {
+              byNum[t.num] = t;
+            }
+          }
+          // Pure runs without jokers
+          for (let start = 1; start <= 11; start++) {
+            const run = [];
+            for (let n = start; n <= 13; n++) {
+              if (!byNum[n]) break;
+              run.push(byNum[n]);
+              if (run.length >= 3) {
+                const pts = ((start + n) * (n - start + 1)) / 2;
+                candidates.push({ tiles: [...run], points: pts, type: 'run' });
+              }
+            }
+          }
+          // Runs using 1 joker to bridge or extend
+          if (jokers.length >= 1) {
+            for (let start = 1; start <= 11; start++) {
+              let usedJoker = false;
+              const run = [];
+              for (let n = start; n <= 13; n++) {
+                if (byNum[n]) {
+                  run.push(byNum[n]);
+                } else if (!usedJoker) {
+                  usedJoker = true;
+                  run.push(jokers[0]);
+                } else {
+                  break;
+                }
+                if (run.length >= 3 && usedJoker) {
+                  const pts = ((start + n) * (n - start + 1)) / 2;
+                  candidates.push({ tiles: [...run], points: pts, type: 'run' });
+                }
+              }
+            }
+          }
+        }
+
+        // Sort candidates by points descending, then tile count descending
+        candidates.sort((a, b) => b.points - a.points || b.tiles.length - a.tiles.length);
+        return candidates;
+      }
+
+      /**
+       * Selects best non-overlapping set of pure-hand plays.
+       * Uses bounded branch-and-bound for speed.
+       */
+      function findBestPureHandPlays(hand, minPoints) {
+        const allCands = findPureHandCandidates(hand).slice(0, 45);
+        let bestSets = [];
+        let bestScore = -1;
+        let bestCount = 0;
+
+        function dfs(idx, usedIds, chosen, pts, count) {
+          if (pts >= minPoints) {
+            if (count > bestCount || (count === bestCount && pts > bestScore)) {
+              bestCount = count;
+              bestScore = pts;
+              bestSets = chosen.slice();
+            }
+          }
+          if (idx >= allCands.length) return;
+          // Prune if remaining candidates can't improve count
+          if (chosen.length >= 5) return;
+
+          const cand = allCands[idx];
+          let overlap = false;
+          for (const t of cand.tiles) {
+            if (usedIds.has(t.id)) { overlap = true; break; }
+          }
+          if (!overlap) {
+            for (const t of cand.tiles) usedIds.add(t.id);
+            chosen.push(cand);
+            dfs(idx + 1, usedIds, chosen, pts + cand.points, count + cand.tiles.length);
+            chosen.pop();
+            for (const t of cand.tiles) usedIds.delete(t.id);
+          }
+          dfs(idx + 1, usedIds, chosen, pts, count);
+        }
+
+        dfs(0, new Set(), [], 0, 0);
+        return { sets: bestSets, totalPoints: bestScore, totalTiles: bestCount };
+      }
+
+      /**
+       * Computes an AI (or Hint) move for a player.
+       * Returns null if no play found, or { newTableSets, remainingHand, playedIds, points }
+       */
+      function computeSmartMove(player, tableSets) {
+        const minPts = player.hasIcebroken ? 0 : setupConfig.icebreakMin;
+
+        // Case A: Not yet icebroken -> must play purely from hand >= minPts
+        if (!player.hasIcebroken) {
+          const res = findBestPureHandPlays(player.hand, minPts);
+          if (res.sets.length === 0) return null;
+          const playedIds = new Set();
+          const addedSets = res.sets.map(c => {
+            c.tiles.forEach(t => playedIds.add(t.id));
+            const v = validateSet(c.tiles);
+            return { id: `set_${state.nextSetUid++}`, tiles: v.orderedTiles };
+          });
+          return {
+            newTableSets: [...tableSets.map(s => ({ id: s.id, tiles: [...s.tiles] })), ...addedSets],
+            remainingHand: player.hand.filter(t => !playedIds.has(t.id)),
+            playedIds,
+            points: res.totalPoints
+          };
+        }
+
+        // Case B: Already icebroken -> play pure hand sets AND extend existing table sets
+        let workingHand = [...player.hand];
+        let workingTable = tableSets.map(s => ({ id: s.id, tiles: [...s.tiles] }));
+        const playedIds = new Set();
+        let totalPoints = 0;
+
+        // Step 1: Play pure hand sets first
+        const pureRes = findBestPureHandPlays(workingHand, 1);
+        if (pureRes.sets.length > 0) {
+          pureRes.sets.forEach(c => {
+            c.tiles.forEach(t => playedIds.add(t.id));
+            const v = validateSet(c.tiles);
+            workingTable.push({ id: `set_${state.nextSetUid++}`, tiles: v.orderedTiles });
+            totalPoints += v.points;
+          });
+          workingHand = workingHand.filter(t => !playedIds.has(t.id));
+        }
+
+        // Step 2: Greedily extend existing table sets with remaining hand tiles (loop until no more extensions)
+        let changed = true;
+        while (changed) {
+          changed = false;
+          for (let i = 0; i < workingHand.length; i++) {
+            const tile = workingHand[i];
+            // Avoid wasting a standalone Joker onto an existing valid set unless it's the last tile in hand!
+            if (tile.isJoker && workingHand.length > 1) continue;
+
+            for (const setObj of workingTable) {
+              const testTiles = [...setObj.tiles, tile];
+              const check = validateSet(testTiles);
+              if (check.valid) {
+                setObj.tiles = check.orderedTiles;
+                playedIds.add(tile.id);
+                totalPoints += tile.isJoker ? 10 : tile.num;
+                workingHand.splice(i, 1);
+                changed = true;
+                break;
+              }
+            }
+            if (changed) break;
+          }
+        }
+
+        if (playedIds.size === 0) return null;
+        return {
+          newTableSets: workingTable,
+          remainingHand: workingHand,
+          playedIds,
+          points: totalPoints
+        };
+      }
+
+      // ============================================================
+      // 5. Game Lifecycle & Turn Management
+      // ============================================================
+      function startGame() {
+        clearTimers();
+        const deck = create6PlayerDeck();
+
+        state.started = true;
+        state.gameOver = false;
+        state.tableSets = [];
+        state.currentPlayerIndex = 0;
+        state.turnNumber = 1;
+        state.consecutivePasses = 0;
+        state.selected = [];
+        state.hintTileIds = new Set();
+        state.justPlayedIds = new Set();
+        state.justDrawnId = null;
+        state.waitingPass = false;
+        state.logs = [];
+        state.nextSetUid = 1;
+
+        state.players = setupConfig.players.map((cfg, idx) => {
+          const hand = deck.splice(0, 14);
+          sortHandTiles(hand, 'color');
+          return {
+            id: idx,
+            name: cfg.name.trim() || `玩家 ${idx + 1}`,
+            isAI: cfg.isAI,
+            avatar: cfg.avatar,
+            hand,
+            hasIcebroken: setupConfig.icebreakMin === 0,
+            sortMode: 'color'
+          };
+        });
+        state.pool = deck;
+
+        document.getElementById('modal-setup').classList.add('hidden');
+        document.getElementById('modal-gameover').classList.add('hidden');
+        document.getElementById('btn-close-setup').classList.remove('hidden');
+
+        addLog('🎲 新局開始！6 位玩家各發 14 張牌，牌池剩餘 ' + state.pool.length + ' 張。', 'system');
+        playSound('success');
+        beginTurn(false);
+      }
+
+      function clearTimers() {
+        if (state.timerHandle) {
+          clearInterval(state.timerHandle);
+          state.timerHandle = null;
+        }
+        if (state.aiTimeoutHandle) {
+          clearTimeout(state.aiTimeoutHandle);
+          state.aiTimeoutHandle = null;
+        }
+      }
+
+      function saveTurnSnapshot() {
+        const player = state.players[state.currentPlayerIndex];
+        const tableTileIds = new Set();
+        state.tableSets.forEach(s => s.tiles.forEach(t => tableTileIds.add(t.id)));
+        state.turnSnapshot = {
+          tableSets: state.tableSets.map(s => ({ id: s.id, tiles: s.tiles.map(t => ({ ...t })) })),
+          hand: player.hand.map(t => ({ ...t })),
+          tableTileIds
+        };
+      }
+
+      function countHumanPlayers() {
+        return state.players.filter(p => !p.isAI).length;
+      }
+
+      function beginTurn(showPassIfMultiHuman = true) {
+        clearTimers();
+        if (state.gameOver) return;
+
+        state.selected = [];
+        state.hintTileIds.clear();
+        saveTurnSnapshot();
+
+        const player = state.players[state.currentPlayerIndex];
+        const multiHuman = countHumanPlayers() >= 2;
+
+        if (!player.isAI && multiHuman && showPassIfMultiHuman) {
+          state.waitingPass = true;
+          document.getElementById('pass-player-text').innerHTML =
+            `輪到 <strong class="text-amber-300">${escapeHtml(player.avatar + ' ' + player.name)}</strong> 的回合，請將裝置交給本人後再顯示手牌。`;
+          document.getElementById('modal-pass').classList.remove('hidden');
+          renderAll();
+          return;
+        }
+
+        state.waitingPass = false;
+        document.getElementById('modal-pass').classList.add('hidden');
+        renderAll();
+
+        if (player.isAI) {
+          startTurnTimer();
+          state.aiTimeoutHandle = setTimeout(() => executeAITurn(), setupConfig.aiDelayMs);
+        } else {
+          startTurnTimer();
+        }
+      }
+
+      function startTurnTimer() {
+        if (state.timerHandle) clearInterval(state.timerHandle);
+        if (setupConfig.turnSeconds <= 0) {
+          document.getElementById('timer-display').textContent = '∞';
+          return;
+        }
+        state.timerRemaining = setupConfig.turnSeconds;
+        updateTimerUI();
+        state.timerHandle = setInterval(() => {
+          if (state.gameOver || state.waitingPass) return;
+          state.timerRemaining--;
+          updateTimerUI();
+          if (state.timerRemaining <= 0) {
+            clearInterval(state.timerHandle);
+            state.timerHandle = null;
+            const player = state.players[state.currentPlayerIndex];
+            if (!player.isAI) {
+              showToast('⏰ 回合超時！已自動還原桌面並抽一張牌', 'error');
+              handleDrawAction(true);
+            }
+          }
+        }, 1000);
+      }
+
+      function updateTimerUI() {
+        const el = document.getElementById('timer-display');
+        const badge = document.getElementById('timer-badge');
+        if (setupConfig.turnSeconds <= 0) {
+          el.textContent = '∞';
+          return;
+        }
+        el.textContent = `${state.timerRemaining}s`;
+        if (state.timerRemaining <= 15) {
+          badge.classList.add('border-red-400', 'text-red-300', 'bg-red-950/70');
+          badge.classList.remove('border-white/15', 'text-amber-200', 'bg-black/40');
+        } else {
+          badge.classList.remove('border-red-400', 'text-red-300', 'bg-red-950/70');
+          badge.classList.add('border-white/15', 'text-amber-200', 'bg-black/40');
+        }
+      }
+
+      function executeAITurn() {
+        if (state.gameOver) return;
+        const player = state.players[state.currentPlayerIndex];
+        if (!player.isAI) return;
+
+        const move = computeSmartMove(player, state.tableSets);
+        if (move) {
+          const wasBroken = player.hasIcebroken;
+          state.tableSets = move.newTableSets;
+          player.hand = move.remainingHand;
+          player.hasIcebroken = true;
+          state.justPlayedIds = new Set(move.playedIds);
+          state.justDrawnId = null;
+          state.consecutivePasses = 0;
+
+          playSound(wasBroken ? 'clack' : 'success');
+          if (!wasBroken && setupConfig.icebreakMin > 0) {
+            addLog(`🔥 ${player.name} 破冰成功！打出 ${move.playedIds.size} 張牌（${move.points} 分）。`, 'play');
+            showToast(`🔥 ${player.name} 破冰成功（${move.points} 分）！`, 'success');
+          } else {
+            addLog(`✨ ${player.name} 打出了 ${move.playedIds.size} 張牌。`, 'play');
+          }
+
+          if (player.hand.length === 0) {
+            finishGame(player, 'empty');
+            return;
+          }
+          advanceTurn();
+        } else {
+          // Draw from pool
+          state.justPlayedIds.clear();
+          if (state.pool.length > 0) {
+            const drawn = state.pool.pop();
+            player.hand.push(drawn);
+            state.consecutivePasses = 0;
+            playSound('draw');
+            addLog(`🃏 ${player.name} 抽了一張牌（手牌 ${player.hand.length} 張）。`, 'draw');
+          } else {
+            state.consecutivePasses++;
+            addLog(`⏭️ 牌池已空，${player.name} 跳過回合。`, 'draw');
+            if (state.consecutivePasses >= state.players.length) {
+              finishGameByLowestScore();
+              return;
+            }
+          }
+          advanceTurn();
+        }
+      }
+
+      function advanceTurn() {
+        state.currentPlayerIndex = (state.currentPlayerIndex + 1) % state.players.length;
+        if (state.currentPlayerIndex === 0) state.turnNumber++;
+        beginTurn(true);
+      }
+
+      // ============================================================
+      // 6. Human Actions: Undo, Draw, Confirm Play, Hint
+      // ============================================================
+      function handleUndoTurn() {
+        const player = state.players[state.currentPlayerIndex];
+        if (player.isAI || state.gameOver || !state.turnSnapshot) return;
+        state.tableSets = state.turnSnapshot.tableSets.map(s => ({ id: s.id, tiles: s.tiles.map(t => ({ ...t })) }));
+        player.hand = state.turnSnapshot.hand.map(t => ({ ...t }));
+        state.selected = [];
+        state.hintTileIds.clear();
+        playSound('draw');
+        showToast('已還原至本回合初始狀態', 'info');
+        renderAll();
+      }
+
+      function handleDrawAction(isTimeout = false) {
+        const player = state.players[state.currentPlayerIndex];
+        if (player.isAI || state.gameOver) return;
+
+        // Revert any uncommitted moves on table
+        if (state.turnSnapshot) {
+          state.tableSets = state.turnSnapshot.tableSets.map(s => ({ id: s.id, tiles: s.tiles.map(t => ({ ...t })) }));
+          player.hand = state.turnSnapshot.hand.map(t => ({ ...t }));
+        }
+        state.selected = [];
+        state.hintTileIds.clear();
+        state.justPlayedIds.clear();
+
+        if (state.pool.length > 0) {
+          const drawn = state.pool.pop();
+          player.hand.push(drawn);
+          sortHandTiles(player.hand, player.sortMode);
+          state.justDrawnId = drawn.id;
+          state.consecutivePasses = 0;
+          playSound('draw');
+          addLog(`🃏 ${player.name} ${isTimeout ? '超時' : ''}抽了一張牌（手牌 ${player.hand.length} 張）。`, 'draw');
+          if (!isTimeout) showToast(`已抽一張牌：${formatTileLabel(drawn)}`, 'info');
+        } else {
+          state.consecutivePasses++;
+          state.justDrawnId = null;
+          addLog(`⏭️ 牌池已空，${player.name} 跳過回合。`, 'draw');
+          showToast('牌池已空，本回合跳過', 'info');
+          if (state.consecutivePasses >= state.players.length) {
+            finishGameByLowestScore();
+            return;
+          }
+        }
+        advanceTurn();
+      }
+
+      function handleConfirmPlay() {
+        const player = state.players[state.currentPlayerIndex];
+        if (player.isAI || state.gameOver || !state.turnSnapshot) return;
+
+        // Clean out any empty sets
+        state.tableSets = state.tableSets.filter(s => s.tiles.length > 0);
+
+        // 1. Check that at least 1 tile from hand was played
+        const initialHandIds = new Set(state.turnSnapshot.hand.map(t => t.id));
+        const currentHandIds = new Set(player.hand.map(t => t.id));
+        const playedFromHandIds = new Set();
+        initialHandIds.forEach(id => {
+          if (!currentHandIds.has(id)) playedFromHandIds.add(id);
+        });
+
+        if (playedFromHandIds.size === 0) {
+          playSound('error');
+          showToast('你尚未從手牌打出任何牌！若不出牌請點「抽牌換人」。', 'error');
+          return;
+        }
+
+        // 2. Validate every set on the table
+        let invalidCount = 0;
+        let firstReason = '';
+        for (const setObj of state.tableSets) {
+          const res = validateSet(setObj.tiles);
+          if (!res.valid) {
+            invalidCount++;
+            if (!firstReason) firstReason = res.reason;
+          } else {
+            setObj.tiles = res.orderedTiles;
+          }
+        }
+
+        if (invalidCount > 0) {
+          playSound('error');
+          showToast(`桌面有 ${invalidCount} 組不合法牌組：${firstReason}`, 'error');
+          renderAll();
+          return;
+        }
+
+        // 3. Icebreak validation if not yet icebroken
+        let icebreakPoints = 0;
+        if (!player.hasIcebroken) {
+          // Verify existing table sets were untouched and new sets only contain hand tiles
+          const oldTableIds = state.turnSnapshot.tableTileIds;
+          const oldSetsSerialized = state.turnSnapshot.tableSets.map(s => s.tiles.map(t => t.id).sort().join(',')).sort();
+
+          const untouchedSets = [];
+          const newHandOnlySets = [];
+
+          for (const setObj of state.tableSets) {
+            const hasOld = setObj.tiles.some(t => oldTableIds.has(t.id));
+            const hasNew = setObj.tiles.some(t => playedFromHandIds.has(t.id));
+            if (hasOld && hasNew) {
+              playSound('error');
+              showToast('尚未破冰前，只能用自己手牌組成新牌組，不能併入桌上現有牌組！', 'error');
+              return;
+            }
+            if (hasOld) {
+              untouchedSets.push(setObj.tiles.map(t => t.id).sort().join(','));
+            } else {
+              newHandOnlySets.push(setObj);
+            }
+          }
+
+          untouchedSets.sort();
+          if (JSON.stringify(untouchedSets) !== JSON.stringify(oldSetsSerialized)) {
+            playSound('error');
+            showToast('尚未破冰前，不可拆解或更動桌上原有的牌組！', 'error');
+            return;
+          }
+
+          for (const ns of newHandOnlySets) {
+            icebreakPoints += validateSet(ns.tiles).points;
+          }
+
+          if (icebreakPoints < setupConfig.icebreakMin) {
+            playSound('error');
+            showToast(`破冰失敗！首次出牌總和須達 ${setupConfig.icebreakMin} 分（目前僅 ${icebreakPoints} 分）。`, 'error');
+            return;
+          }
+        }
+
+        // Commit valid play!
+        const wasBroken = player.hasIcebroken;
+        player.hasIcebroken = true;
+        state.justPlayedIds = new Set(playedFromHandIds);
+        state.justDrawnId = null;
+        state.consecutivePasses = 0;
+        state.selected = [];
+        state.hintTileIds.clear();
+
+        playSound(wasBroken ? 'clack' : 'success');
+        if (!wasBroken && setupConfig.icebreakMin > 0) {
+          addLog(`🔥 ${player.name} 破冰成功！打出 ${playedFromHandIds.size} 張牌（${icebreakPoints} 分）。`, 'play');
+          showToast(`🔥 破冰成功！（${icebreakPoints} 分）`, 'success');
+        } else {
+          addLog(`✨ ${player.name} 打出了 ${playedFromHandIds.size} 張牌。`, 'play');
+        }
+
+        if (player.hand.length === 0) {
+          finishGame(player, 'empty');
+          return;
+        }
+        advanceTurn();
+      }
+
+      function handleHint() {
+        const player = state.players[state.currentPlayerIndex];
+        if (player.isAI || state.gameOver) return;
+
+        // Run solver from current table + hand
+        const move = computeSmartMove(player, state.tableSets);
+        state.hintTileIds.clear();
+        if (!move) {
+          playSound('draw');
+          showToast('💡 目前手牌尚無直接可出的合法組合，建議先「抽牌換人」。', 'info');
+          renderAll();
+          return;
+        }
+        move.playedIds.forEach(id => state.hintTileIds.add(id));
+        playSound('select');
+        const msg = !player.hasIcebroken && setupConfig.icebreakMin > 0
+          ? `💡 發現破冰組合！藍色發光的 ${move.playedIds.size} 張手牌可組成 ${move.points} 分。`
+          : `💡 發現可出的牌！藍色發光的 ${move.playedIds.size} 張手牌可以打出或接在桌上牌組。`;
+        showToast(msg, 'success');
+        renderAll();
+      }
+
+      function finishGame(winner, reason) {
+        clearTimers();
+        state.gameOver = true;
+        playSound('win');
+
+        // Calculate penalty scores
+        let totalPenalty = 0;
+        const rows = state.players.map(p => {
+          const penalty = p.hand.reduce((sum, t) => sum + (t.isJoker ? 30 : t.num), 0);
+          if (p.id !== winner.id) totalPenalty += penalty;
+          return { player: p, penalty };
+        });
+
+        rows.forEach(r => {
+          r.finalScore = r.player.id === winner.id ? totalPenalty : -r.penalty;
+        });
+        rows.sort((a, b) => b.finalScore - a.finalScore);
+
+        document.getElementById('winner-title').textContent = `${winner.avatar} ${winner.name} 獲勝！`;
+        document.getElementById('winner-subtitle').textContent =
+          reason === 'empty'
+            ? `率先清空手牌，本局淨得 +${totalPenalty} 分！`
+            : `牌池已空且全員跳過，手牌點數最少者獲勝！`;
+
+        const body = document.getElementById('scoreboard-body');
+        body.innerHTML = rows.map((r, rank) => `
+          <div class="flex items-center justify-between px-3.5 py-2.5 rounded-xl ${r.player.id === winner.id ? 'bg-amber-500/20 border border-amber-400/50' : 'bg-white/5 border border-white/10'}">
+            <div class="flex items-center gap-2.5">
+              <span class="w-6 text-center font-black text-sm ${rank === 0 ? 'text-amber-300' : 'text-slate-400'}">#${rank + 1}</span>
+              <span class="text-xl">${r.player.avatar}</span>
+              <div>
+                <div class="font-bold text-sm text-white">${escapeHtml(r.player.name)}</div>
+                <div class="text-[11px] text-slate-400">剩餘 ${r.player.hand.length} 張牌（點數 ${r.penalty}）</div>
+              </div>
+            </div>
+            <div class="font-black text-base tabular-nums ${r.finalScore >= 0 ? 'text-emerald-400' : 'text-rose-400'}">
+              ${r.finalScore > 0 ? '+' : ''}${r.finalScore}
+            </div>
+          </div>
+        `).join('');
+
+        addLog(`🏆 遊戲結束！${winner.name} 獲得勝利（+${totalPenalty} 分）！`, 'win');
+        document.getElementById('modal-gameover').classList.remove('hidden');
+        renderAll();
+      }
+
+      function finishGameByLowestScore() {
+        let winner = state.players[0];
+        let lowest = Infinity;
+        for (const p of state.players) {
+          const sum = p.hand.reduce((acc, t) => acc + (t.isJoker ? 30 : t.num), 0);
+          if (sum < lowest) {
+            lowest = sum;
+            winner = p;
+          }
+        }
+        finishGame(winner, 'pool_empty');
+      }
+
+      // ============================================================
+      // 7. Tile Selection, Placement & Drag-and-Drop
+      // ============================================================
+      function isTileSelected(tileId) {
+        return state.selected.some(s => s.tileId === tileId);
+      }
+
+      function canManipulateTableTile(tileId) {
+        const player = state.players[state.currentPlayerIndex];
+        if (player.hasIcebroken) return true;
+        // If not yet icebroken, can only move tiles that originated from player's hand this turn
+        return state.turnSnapshot && !state.turnSnapshot.tableTileIds.has(tileId);
+      }
+
+      function toggleSelectTile(tileId, source, setId = null) {
+        const player = state.players[state.currentPlayerIndex];
+        if (player.isAI || state.gameOver || state.waitingPass) return;
+
+        if (source === 'table' && !canManipulateTableTile(tileId)) {
+          playSound('error');
+          showToast('尚未破冰前，無法移動桌上原有的牌！', 'error');
+          return;
+        }
+
+        const idx = state.selected.findIndex(s => s.tileId === tileId);
+        if (idx >= 0) {
+          state.selected.splice(idx, 1);
+        } else {
+          state.selected.push({ tileId, source, setId });
+        }
+        playSound('select');
+        renderAll();
+      }
+
+      function extractTileById(tileId) {
+        const player = state.players[state.currentPlayerIndex];
+        // Check hand
+        const hIdx = player.hand.findIndex(t => t.id === tileId);
+        if (hIdx >= 0) {
+          return player.hand.splice(hIdx, 1)[0];
+        }
+        // Check table sets
+        for (const s of state.tableSets) {
+          const tIdx = s.tiles.findIndex(t => t.id === tileId);
+          if (tIdx >= 0) {
+            const tile = s.tiles.splice(tIdx, 1)[0];
+            return tile;
+          }
+        }
+        return null;
+      }
+
+      function cleanupEmptySets() {
+        state.tableSets = state.tableSets.filter(s => s.tiles.length > 0);
+      }
+
+      function moveSelectedToNewSet() {
+        const player = state.players[state.currentPlayerIndex];
+        if (player.isAI || state.gameOver || state.selected.length === 0) return;
+
+        const moved = [];
+        for (const sel of state.selected) {
+          const t = extractTileById(sel.tileId);
+          if (t) moved.push(t);
+        }
+        cleanupEmptySets();
+
+        if (moved.length > 0) {
+          const check = validateSet(moved);
+          state.tableSets.push({
+            id: `set_${state.nextSetUid++}`,
+            tiles: check.valid ? check.orderedTiles : moved
+          });
+          playSound('clack');
+        }
+        state.selected = [];
+        renderAll();
+      }
+
+      function moveSelectedToExistingSet(targetSetId) {
+        const player = state.players[state.currentPlayerIndex];
+        if (player.isAI || state.gameOver || state.selected.length === 0) return;
+
+        const targetSet = state.tableSets.find(s => s.id === targetSetId);
+        if (!targetSet) return;
+
+        // If not icebroken, cannot add to a set that contains old table tiles
+        if (!player.hasIcebroken && state.turnSnapshot) {
+          const hasOld = targetSet.tiles.some(t => state.turnSnapshot.tableTileIds.has(t.id));
+          if (hasOld) {
+            playSound('error');
+            showToast('尚未破冰前，請點「＋ 放成新牌組」，不能加入桌上原有的牌組！', 'error');
+            return;
+          }
+        }
+
+        const moved = [];
+        for (const sel of state.selected) {
+          if (sel.source === 'table' && sel.setId === targetSetId) continue;
+          const t = extractTileById(sel.tileId);
+          if (t) moved.push(t);
+        }
+
+        if (moved.length > 0) {
+          targetSet.tiles.push(...moved);
+          const check = validateSet(targetSet.tiles);
+          if (check.valid) targetSet.tiles = check.orderedTiles;
+          cleanupEmptySets();
+          playSound('clack');
+        }
+        state.selected = [];
+        renderAll();
+      }
+
+      function returnSelectedToHand() {
+        const player = state.players[state.currentPlayerIndex];
+        if (player.isAI || state.gameOver || state.selected.length === 0) return;
+
+        let returned = 0;
+        let blocked = 0;
+        for (const sel of state.selected) {
+          if (sel.source === 'table') {
+            // Only tiles that started in the player's hand this turn can go back to hand
+            if (state.turnSnapshot && state.turnSnapshot.tableTileIds.has(sel.tileId)) {
+              blocked++;
+              continue;
+            }
+            const t = extractTileById(sel.tileId);
+            if (t) {
+              player.hand.push(t);
+              returned++;
+            }
+          }
+        }
+        cleanupEmptySets();
+        if (returned > 0) {
+          sortHandTiles(player.hand, player.sortMode);
+          playSound('draw');
+        }
+        if (blocked > 0) {
+          showToast('原本就在桌上的牌不能收回手牌喔！', 'error');
+        }
+        state.selected = [];
+        renderAll();
+      }
+
+      function handleDropOnSet(dragPayload, targetSetId) {
+        const player = state.players[state.currentPlayerIndex];
+        if (player.isAI || state.gameOver) return;
+        const targetSet = state.tableSets.find(s => s.id === targetSetId);
+        if (!targetSet) return;
+
+        if (!player.hasIcebroken && state.turnSnapshot) {
+          const hasOld = targetSet.tiles.some(t => state.turnSnapshot.tableTileIds.has(t.id));
+          if (hasOld) {
+            playSound('error');
+            showToast('尚未破冰前，不可加入桌上原有的牌組！', 'error');
+            return;
+          }
+        }
+
+        // If dragged tile is part of multi-selection, move all selected; otherwise move just dragged tile
+        const idsToMove = isTileSelected(dragPayload.tileId)
+          ? state.selected.map(s => s.tileId)
+          : [dragPayload.tileId];
+
+        const moved = [];
+        for (const id of idsToMove) {
+          if (targetSet.tiles.some(t => t.id === id)) continue;
+          if (!canManipulateTableTile(id) && !player.hand.some(t => t.id === id)) continue;
+          const t = extractTileById(id);
+          if (t) moved.push(t);
+        }
+
+        if (moved.length > 0) {
+          targetSet.tiles.push(...moved);
+          const check = validateSet(targetSet.tiles);
+          if (check.valid) targetSet.tiles = check.orderedTiles;
+          cleanupEmptySets();
+          playSound('clack');
+        }
+        state.selected = [];
+        renderAll();
+      }
+
+      function handleDropOnTableEmpty(dragPayload) {
+        const player = state.players[state.currentPlayerIndex];
+        if (player.isAI || state.gameOver) return;
+
+        const idsToMove = isTileSelected(dragPayload.tileId)
+          ? state.selected.map(s => s.tileId)
+          : [dragPayload.tileId];
+
+        const moved = [];
+        for (const id of idsToMove) {
+          if (!canManipulateTableTile(id) && !player.hand.some(t => t.id === id)) continue;
+          const t = extractTileById(id);
+          if (t) moved.push(t);
+        }
+        cleanupEmptySets();
+        if (moved.length > 0) {
+          const check = validateSet(moved);
+          state.tableSets.push({
+            id: `set_${state.nextSetUid++}`,
+            tiles: check.valid ? check.orderedTiles : moved
+          });
+          playSound('clack');
+        }
+        state.selected = [];
+        renderAll();
+      }
+
+      function handleDropOnHand(dragPayload) {
+        const player = state.players[state.currentPlayerIndex];
+        if (player.isAI || state.gameOver) return;
+
+        const idsToMove = isTileSelected(dragPayload.tileId)
+          ? state.selected.map(s => s.tileId)
+          : [dragPayload.tileId];
+
+        let movedBack = 0;
+        let blocked = 0;
+        for (const id of idsToMove) {
+          if (player.hand.some(t => t.id === id)) continue;
+          if (state.turnSnapshot && state.turnSnapshot.tableTileIds.has(id)) {
+            blocked++;
+            continue;
+          }
+          const t = extractTileById(id);
+          if (t) {
+            player.hand.push(t);
+            movedBack++;
+          }
+        }
+        cleanupEmptySets();
+        if (movedBack > 0) {
+          sortHandTiles(player.hand, player.sortMode);
+          playSound('draw');
+        }
+        if (blocked > 0) {
+          showToast('原本就在桌上的牌不能收回手牌喔！', 'error');
+        }
+        state.selected = [];
+        renderAll();
+      }
+
+      // ============================================================
+      // 8. Sorting, Rendering & UI Helpers
+      // ============================================================
+      function sortHandTiles(hand, mode) {
+        hand.sort((a, b) => {
+          if (a.isJoker && !b.isJoker) return 1;
+          if (!a.isJoker && b.isJoker) return -1;
+          if (a.isJoker && b.isJoker) return COLOR_ORDER[a.color] - COLOR_ORDER[b.color];
+          if (mode === 'num') {
+            return a.num - b.num || COLOR_ORDER[a.color] - COLOR_ORDER[b.color];
+          }
+          return COLOR_ORDER[a.color] - COLOR_ORDER[b.color] || a.num - b.num;
+        });
+      }
+
+      function formatTileLabel(t) {
+        if (t.isJoker) return '百搭鬼牌 🃏';
+        const cMap = { red: '紅', blue: '藍', orange: '橘', black: '黑' };
+        return `${cMap[t.color]}${t.num}`;
+      }
+
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      function createTileElement(tile, source, setId = null, isSmall = false) {
+        const el = document.createElement('div');
+        el.className = `rummi-tile ${isSmall ? 'tile-sm' : ''}`;
+        if (isTileSelected(tile.id)) el.classList.add('selected');
+        if (state.hintTileIds.has(tile.id)) el.classList.add('hint-glow');
+        if (source === 'table' && state.justPlayedIds.has(tile.id)) el.classList.add('just-played');
+        if (source === 'hand' && state.justDrawnId === tile.id) el.classList.add('just-drawn');
+
+        const player = state.players[state.currentPlayerIndex];
+        const draggable = !player.isAI && !state.gameOver && !state.waitingPass && (source === 'hand' || canManipulateTableTile(tile.id));
+        el.draggable = draggable;
+
+        if (tile.isJoker) {
+          const stroke = tile.color === 'red' ? '#dc2626' : '#18181b';
+          el.innerHTML = `
+            <svg viewBox="0 0 36 36" class="${isSmall ? 'w-7 h-7' : 'w-8 h-8'} z-10" fill="none">
+              <circle cx="18" cy="19" r="11" stroke="${stroke}" stroke-width="2.2" fill="#fff"/>
+              <path d="M9 12 L13 6 L18 11 L23 6 L27 12" stroke="${stroke}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="14.5" cy="17.5" r="1.6" fill="${stroke}"/>
+              <circle cx="21.5" cy="17.5" r="1.6" fill="${stroke}"/>
+              <path d="M13.5 22.5 Q18 26.5 22.5 22.5" stroke="${stroke}" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          `;
+          el.title = '百搭鬼牌 (Joker)';
+        } else {
+          el.innerHTML = `
+            <span class="tile-num color-${tile.color}">${tile.num}</span>
+            <span class="tile-dot dot-${tile.color}"></span>
+          `;
+          el.title = formatTileLabel(tile);
+        }
+
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggleSelectTile(tile.id, source, setId);
+        });
+
+        if (draggable) {
+          el.addEventListener('dragstart', (e) => {
+            el.classList.add('dragging');
+            e.dataTransfer.setData('text/plain', JSON.stringify({ tileId: tile.id, source, setId }));
+            e.dataTransfer.effectAllowed = 'move';
+          });
+          el.addEventListener('dragend', () => {
+            el.classList.remove('dragging');
+          });
+        }
+
+        return el;
+      }
+
+      function renderPlayersBar() {
+        const bar = document.getElementById('players-bar');
+        bar.innerHTML = '';
+        state.players.forEach((p, idx) => {
+          const active = idx === state.currentPlayerIndex && !state.gameOver;
+          const card = document.createElement('div');
+          card.className = `flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-xl border transition-all ${
+            active
+              ? 'bg-amber-400/20 border-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.3)] scale-[1.01]'
+              : 'bg-black/25 border-white/10 opacity-85'
+          }`;
+          card.innerHTML = `
+            <div class="flex items-center gap-2 min-w-0">
+              <div class="text-lg sm:text-xl leading-none shrink-0">${p.avatar}</div>
+              <div class="min-w-0">
+                <div class="flex items-center gap-1">
+                  <span class="text-xs font-bold truncate ${active ? 'text-amber-200' : 'text-white'}">${escapeHtml(p.name)}</span>
+                  ${p.isAI ? '<span class="text-[9px] px-1 rounded bg-white/10 text-slate-300 shrink-0">AI</span>' : ''}
+                </div>
+                <div class="text-[10px] ${p.hasIcebroken ? 'text-emerald-300' : 'text-sky-300/90'}">
+                  ${p.hasIcebroken ? '🔥 已破冰' : '❄️ 未破冰'}
+                </div>
+              </div>
+            </div>
+            <div class="flex flex-col items-end shrink-0">
+              <span class="text-sm sm:text-base font-black tabular-nums ${p.hand.length <= 3 ? 'text-rose-300' : 'text-white'}">${p.hand.length}</span>
+              <span class="text-[9px] text-emerald-200/70 -mt-1">張牌</span>
+            </div>
+          `;
+          bar.appendChild(card);
+        });
+      }
+
+      function renderTable() {
+        const tableEl = document.getElementById('table-area');
+        tableEl.innerHTML = '';
+
+        if (state.tableSets.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'w-full h-full min-h-[160px] flex flex-col items-center justify-center text-center text-emerald-100/55 pointer-events-none select-none';
+          empty.innerHTML = `
+            <div class="text-3xl mb-2 opacity-60">🀄</div>
+            <p class="text-sm font-semibold">桌面目前是空的</p>
+            <p class="text-xs mt-1">點選下方手牌後按「＋ 放成新牌組」，或直接拖曳牌到此處</p>
+          `;
+          tableEl.appendChild(empty);
+          return;
+        }
+
+        const oldIds = state.turnSnapshot ? state.turnSnapshot.tableTileIds : new Set();
+
+        state.tableSets.forEach(setObj => {
+          const check = validateSet(setObj.tiles);
+          const groupDiv = document.createElement('div');
+          groupDiv.className = 'table-set';
+          if (!check.valid) {
+            groupDiv.classList.add('invalid-set');
+            groupDiv.title = check.reason;
+          } else if (setObj.tiles.some(t => !oldIds.has(t.id))) {
+            groupDiv.classList.add('new-turn-set');
+          }
+
+          setObj.tiles.forEach(tile => {
+            groupDiv.appendChild(createTileElement(tile, 'table', setObj.id, true));
+          });
+
+          // Show quick "+加入" button on each set when tiles are selected
+          if (state.selected.length > 0 && !state.players[state.currentPlayerIndex].isAI && !state.gameOver) {
+            const addBtn = document.createElement('button');
+            addBtn.type = 'button';
+            addBtn.className = 'ml-1 px-2 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow transition shrink-0';
+            addBtn.textContent = '＋';
+            addBtn.title = '將已選取的牌加入此組';
+            addBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              moveSelectedToExistingSet(setObj.id);
+            });
+            groupDiv.appendChild(addBtn);
+          }
+
+          // Clicking the set container places selected tiles into it
+          groupDiv.addEventListener('click', (e) => {
+            if (state.selected.length > 0) {
+              e.stopPropagation();
+              moveSelectedToExistingSet(setObj.id);
+            }
+          });
+
+          // Drag-and-drop target
+          groupDiv.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            groupDiv.classList.add('drop-target');
+          });
+          groupDiv.addEventListener('dragleave', () => {
+            groupDiv.classList.remove('drop-target');
+          });
+          groupDiv.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            groupDiv.classList.remove('drop-target');
+            try {
+              const payload = JSON.parse(e.dataTransfer.getData('text/plain'));
+              handleDropOnSet(payload, setObj.id);
+            } catch (_) {}
+          });
+
+          tableEl.appendChild(groupDiv);
+        });
+      }
+
+      function renderHandAndControls() {
+        const player = state.players[state.currentPlayerIndex];
+        const rack = document.getElementById('hand-rack');
+        const ownerLabel = document.getElementById('hand-owner-label');
+        const banner = document.getElementById('turn-banner');
+        const pill = document.getElementById('icebreak-status-pill');
+
+        document.getElementById('pool-count').textContent = state.pool.length;
+
+        if (!player) return;
+
+        // Banner
+        if (state.gameOver) {
+          banner.textContent = '🏆 對局已結束';
+          pill.classList.add('hidden');
+        } else if (player.isAI) {
+          banner.textContent = `🤖 第 ${state.turnNumber} 輪 · ${player.name} 正在思考出牌...`;
+          pill.classList.add('hidden');
+        } else {
+          banner.textContent = `🎯 第 ${state.turnNumber} 輪 · 輪到 ${player.avatar} ${player.name}`;
+          pill.classList.remove('hidden');
+          if (player.hasIcebroken) {
+            pill.textContent = '🔥 已破冰（可自由拆解桌牌）';
+            pill.className = 'px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-200 border border-emerald-400/30';
+          } else {
+            pill.textContent = `❄️ 尚未破冰（首出需 ≥ ${setupConfig.icebreakMin} 分）`;
+            pill.className = 'px-2 py-0.5 rounded-full text-[11px] font-semibold bg-sky-500/20 text-sky-200 border border-sky-400/30';
+          }
+        }
+
+        // Determine which human hand to display on the rack
+        let displayPlayer = player;
+        let isInteractive = !player.isAI && !state.gameOver && !state.waitingPass;
+
+        if (player.isAI) {
+          // If only 1 human player exists, keep showing that human's hand while AI plays!
+          const humans = state.players.filter(p => !p.isAI);
+          if (humans.length === 1) {
+            displayPlayer = humans[0];
+          }
+        }
+
+        rack.innerHTML = '';
+        if (state.waitingPass || (player.isAI && countHumanPlayers() !== 1)) {
+          ownerLabel.textContent = `${player.avatar} ${player.name} 的回合`;
+          rack.innerHTML = `<div class="w-full text-center text-xs text-amber-200/70 py-4">${
+            state.waitingPass ? '🙈 換手遮蔽中...' : `🤖 ${escapeHtml(player.name)} 正在思考...`
+          }</div>`;
+        } else {
+          ownerLabel.textContent = `${displayPlayer.avatar} ${displayPlayer.name} 的手牌 (${displayPlayer.hand.length})`;
+          displayPlayer.hand.forEach(tile => {
+            rack.appendChild(createTileElement(tile, 'hand', null, false));
+          });
+        }
+
+        // Enable/disable controls
+        const hasSel = state.selected.length > 0;
+        const hasTableSel = state.selected.some(s => s.source === 'table');
+        document.getElementById('btn-new-set').disabled = !isInteractive || !hasSel;
+        document.getElementById('btn-return-hand').disabled = !isInteractive || !hasTableSel;
+        document.getElementById('btn-clear-sel').disabled = !isInteractive || !hasSel;
+        document.getElementById('btn-undo').disabled = !isInteractive;
+        document.getElementById('btn-draw').disabled = !isInteractive;
+        document.getElementById('btn-confirm').disabled = !isInteractive;
+        document.getElementById('btn-hint').disabled = !isInteractive;
+        document.getElementById('btn-sort-num').disabled = state.waitingPass || (player.isAI && countHumanPlayers() !== 1);
+        document.getElementById('btn-sort-color').disabled = state.waitingPass || (player.isAI && countHumanPlayers() !== 1);
+      }
+
+      function renderAll() {
+        renderPlayersBar();
+        renderTable();
+        renderHandAndControls();
+      }
+
+      function addLog(text, kind = 'info') {
+        const time = new Date().toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        state.logs.unshift({ text, kind, time });
+        if (state.logs.length > 80) state.logs.pop();
+
+        const list = document.getElementById('log-list');
+        const colorMap = {
+          system: 'text-amber-200 bg-amber-500/10 border-amber-400/20',
+          play: 'text-emerald-200 bg-emerald-500/10 border-emerald-400/20',
+          draw: 'text-slate-300 bg-white/5 border-white/10',
+          win: 'text-amber-300 bg-amber-500/20 border-amber-400/40 font-bold'
+        };
+        list.innerHTML = state.logs.map(item => `
+          <div class="px-2.5 py-1.5 rounded-lg border ${colorMap[item.kind] || colorMap.draw}">
+            <div class="text-[10px] opacity-60 mb-0.5">${item.time}</div>
+            <div>${escapeHtml(item.text)}</div>
+          </div>
+        `).join('');
+      }
+
+      function showToast(message, type = 'info') {
+        const container = document.getElementById('toast-container');
+        const el = document.createElement('div');
+        const styles = {
+          info: 'bg-slate-900/95 border-sky-400/50 text-sky-100',
+          success: 'bg-emerald-950/95 border-emerald-400/60 text-emerald-100',
+          error: 'bg-rose-950/95 border-rose-400/70 text-rose-100'
+        };
+        el.className = `px-4 py-2 rounded-xl border shadow-xl text-xs sm:text-sm font-semibold text-center backdrop-blur-md transition-all duration-300 ${styles[type] || styles.info}`;
+        el.textContent = message;
+        container.appendChild(el);
+        setTimeout(() => {
+          el.style.opacity = '0';
+          el.style.transform = 'translateY(-8px)';
+          setTimeout(() => el.remove(), 300);
+        }, 2800);
+      }
+
+      // ============================================================
+      // 9. Setup Modal Rendering & Events
+      // ============================================================
+      function renderSetupSeats() {
+        const container = document.getElementById('setup-seats');
+        container.innerHTML = '';
+        setupConfig.players.forEach((p, idx) => {
+          const row = document.createElement('div');
+          row.className = 'flex items-center gap-2 p-2.5 rounded-xl bg-slate-800/80 border border-white/10';
+          row.innerHTML = `
+            <span class="text-xl shrink-0">${p.avatar}</span>
+            <input type="text" maxlength="10" value="${escapeHtml(p.name)}" data-seat-name="${idx}"
+              class="flex-1 min-w-0 bg-slate-900 border border-white/15 rounded-lg px-2.5 py-1 text-xs sm:text-sm text-white focus:outline-none focus:border-amber-400" />
+            <button type="button" data-seat-toggle="${idx}"
+              class="px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition ${
+                p.isAI
+                  ? 'bg-indigo-500/25 text-indigo-200 border border-indigo-400/40 hover:bg-indigo-500/40'
+                  : 'bg-emerald-500/25 text-emerald-200 border border-emerald-400/40 hover:bg-emerald-500/40'
+              }">
+              ${p.isAI ? '🤖 AI' : '👤 人類'}
+            </button>
+          `;
+          container.appendChild(row);
+        });
+
+        container.querySelectorAll('[data-seat-name]').forEach(inp => {
+          inp.addEventListener('input', (e) => {
+            const idx = Number(e.target.dataset.seatName);
+            setupConfig.players[idx].name = e.target.value;
+          });
+        });
+
+        container.querySelectorAll('[data-seat-toggle]').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const idx = Number(e.currentTarget.dataset.seatToggle);
+            const cur = setupConfig.players[idx];
+            cur.isAI = !cur.isAI;
+            if (cur.isAI && cur.name.startsWith('玩家 ')) {
+              cur.name = DEFAULT_NAMES[idx].startsWith('AI') ? DEFAULT_NAMES[idx] : `AI-電腦${idx + 1}`;
+            } else if (!cur.isAI && cur.name.startsWith('AI')) {
+              cur.name = `玩家 ${idx + 1}`;
+            }
+            renderSetupSeats();
+          });
+        });
+      }
+
+      function applyPreset(preset) {
+        const humanCount = preset === '6h' ? 6 : preset === '3h3a' ? 3 : preset === '2h4a' ? 2 : 1;
+        setupConfig.players.forEach((p, idx) => {
+          p.isAI = idx >= humanCount;
+          p.name = p.isAI
+            ? (DEFAULT_NAMES[idx].startsWith('AI') ? DEFAULT_NAMES[idx] : `AI-電腦${idx + 1}`)
+            : `玩家 ${idx + 1}`;
+        });
+        renderSetupSeats();
+      }
+
+      // ============================================================
+      // 10. Wire Up All DOM Event Listeners
+      // ============================================================
+      function initEvents() {
+        // Table empty area click & drop
+        const tableArea = document.getElementById('table-area');
+        tableArea.addEventListener('click', () => {
+          if (state.selected.length > 0) {
+            moveSelectedToNewSet();
+          }
+        });
+        tableArea.addEventListener('dragover', (e) => {
+          e.preventDefault();
+        });
+        tableArea.addEventListener('drop', (e) => {
+          e.preventDefault();
+          try {
+            const payload = JSON.parse(e.dataTransfer.getData('text/plain'));
+            handleDropOnTableEmpty(payload);
+          } catch (_) {}
+        });
+
+        // Hand rack drop (return to hand)
+        const handRack = document.getElementById('hand-rack');
+        handRack.addEventListener('dragover', (e) => e.preventDefault());
+        handRack.addEventListener('drop', (e) => {
+          e.preventDefault();
+          try {
+            const payload = JSON.parse(e.dataTransfer.getData('text/plain'));
+            handleDropOnHand(payload);
+          } catch (_) {}
+        });
+
+        // Toolbar & Action Buttons
+        document.getElementById('btn-new-set').addEventListener('click', moveSelectedToNewSet);
+        document.getElementById('btn-return-hand').addEventListener('click', returnSelectedToHand);
+        document.getElementById('btn-clear-sel').addEventListener('click', () => {
+          state.selected = [];
+          renderAll();
+        });
+
+        document.getElementById('btn-sort-num').addEventListener('click', () => {
+          const p = getVisibleHandPlayer();
+          if (!p) return;
+          p.sortMode = 'num';
+          sortHandTiles(p.hand, 'num');
+          playSound('select');
+          renderHandAndControls();
+        });
+
+        document.getElementById('btn-sort-color').addEventListener('click', () => {
+          const p = getVisibleHandPlayer();
+          if (!p) return;
+          p.sortMode = 'color';
+          sortHandTiles(p.hand, 'color');
+          playSound('select');
+          renderHandAndControls();
+        });
+
+        document.getElementById('btn-hint').addEventListener('click', handleHint);
+        document.getElementById('btn-undo').addEventListener('click', handleUndoTurn);
+        document.getElementById('btn-draw').addEventListener('click', () => handleDrawAction(false));
+        document.getElementById('btn-confirm').addEventListener('click', handleConfirmPlay);
+
+        // Header controls
+        document.getElementById('btn-sound').addEventListener('click', () => {
+          soundEnabled = !soundEnabled;
+          document.getElementById('sound-icon').textContent = soundEnabled ? '🔊' : '🔇';
+          if (soundEnabled) playSound('select');
+        });
+
+        document.getElementById('btn-toggle-log').addEventListener('click', () => {
+          document.getElementById('log-drawer').classList.toggle('hidden');
+        });
+        document.getElementById('btn-close-log').addEventListener('click', () => {
+          document.getElementById('log-drawer').classList.add('hidden');
+        });
+
+        // Rules modal
+        document.getElementById('btn-rules').addEventListener('click', () => {
+          document.getElementById('modal-rules').classList.remove('hidden');
+        });
+        document.getElementById('btn-close-rules').addEventListener('click', () => {
+          document.getElementById('modal-rules').classList.add('hidden');
+        });
+        document.getElementById('btn-ok-rules').addEventListener('click', () => {
+          document.getElementById('modal-rules').classList.add('hidden');
+        });
+
+        // Setup modal
+        document.getElementById('btn-setup').addEventListener('click', () => {
+          renderSetupSeats();
+          document.getElementById('modal-setup').classList.remove('hidden');
+        });
+        document.getElementById('btn-close-setup').addEventListener('click', () => {
+          document.getElementById('modal-setup').classList.add('hidden');
+        });
+        document.querySelectorAll('.preset-btn').forEach(btn => {
+          btn.addEventListener('click', () => applyPreset(btn.dataset.preset));
+        });
+        document.getElementById('btn-start-game').addEventListener('click', () => {
+          setupConfig.icebreakMin = Number(document.getElementById('opt-icebreak').value);
+          setupConfig.turnSeconds = Number(document.getElementById('opt-timer').value);
+          setupConfig.aiDelayMs = Number(document.getElementById('opt-ai-speed').value);
+          startGame();
+        });
+
+        // Pass device modal
+        document.getElementById('btn-pass-ready').addEventListener('click', () => {
+          state.waitingPass = false;
+          document.getElementById('modal-pass').classList.add('hidden');
+          playSound('select');
+          renderAll();
+          startTurnTimer();
+        });
+
+        // Gameover modal
+        document.getElementById('btn-rematch').addEventListener('click', startGame);
+        document.getElementById('btn-gameover-setup').addEventListener('click', () => {
+          document.getElementById('modal-gameover').classList.add('hidden');
+          renderSetupSeats();
+          document.getElementById('modal-setup').classList.remove('hidden');
+        });
+      }
+
+      function getVisibleHandPlayer() {
+        const cur = state.players[state.currentPlayerIndex];
+        if (!cur) return null;
+        if (!cur.isAI) return cur;
+        const humans = state.players.filter(p => !p.isAI);
+        return humans.length === 1 ? humans[0] : null;
+      }
+
+      window.addEventListener('load', () => {
+        initEvents();
+        renderSetupSeats();
+      });
+    })();
+  </script>
+</body>
+</html>
