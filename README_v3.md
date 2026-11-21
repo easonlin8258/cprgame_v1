@@ -18,6 +18,6 @@
 - `heart_pulse.gif` — 透明背景脈動心跳動畫 GIF
 - `heart_icon.png` — 網頁 Favicon 圖示
 - `nurse_start.gif` — 待機、陪伴與空壓測驗護理師動畫
-- `Bonus1.GIF` — 點擊任意畫面上的 `nurse_start.gif` 時切換顯示的彩蛋動畫
+- `Bonus1.gif` — 點擊任意畫面上的 `nurse_start.gif` 時切換顯示的彩蛋動畫
 - `nurse_success.gif` — 救援成功（≥80%）護理師動畫
 - `nurse_fail.gif` — 救援失敗（<80%）護理師動畫
