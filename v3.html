@@ -1,0 +1,3950 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>CPR 節奏訓練系統：黃金四分鐘 (v3 三模式整合版)</title>
+  <link rel="icon" type="image/png" href="heart_icon.png" />
+  <style>
+    :root {
+      --bg-dark: #0a101d;
+      --panel-bg: #111827;
+      --panel-border: #1f2937;
+      --hud-glass: rgba(24, 34, 52, 0.80);
+      --hud-border: rgba(255, 255, 255, 0.16);
+      --text-main: #f3f4f6;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-teal: #2dd4bf;
+      --accent-green: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-red: #ef4444;
+      --accent-purple: #8b5cf6;
+      --accent-pink: #f472b6;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", sans-serif;
+      touch-action: manipulation;
+    }
+
+    .app-shell {
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      position: relative;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    }
+
+    /* ==================== TOP BAR ==================== */
+    .top-bar {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      padding: 6px 12px 7px;
+      background: #0c1424;
+      border-bottom: 1px solid rgba(56, 189, 248, 0.18);
+      z-index: 30;
+    }
+
+    .top-bar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .brand-title {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 14px;
+      font-weight: 900;
+      color: #38bdf8;
+      white-space: nowrap;
+    }
+
+    .badge-ver {
+      font-size: 10.5px;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(45, 212, 191, 0.18);
+      color: #5eead4;
+      border: 1px solid rgba(45, 212, 191, 0.45);
+    }
+
+    .controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .pill-group {
+      display: flex;
+      align-items: center;
+      background: #141f33;
+      border-radius: 9px;
+      padding: 2px;
+      border: 1px solid #26354f;
+      gap: 2px;
+    }
+
+    .pill-btn {
+      border: none;
+      background: transparent;
+      color: #cbd5e1;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 8px;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .pill-btn:hover { color: #ffffff; }
+
+    .pill-btn.active {
+      background: #38bdf8;
+      color: #061326;
+      font-weight: 800;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.35);
+    }
+
+    .pill-group.view-group .pill-btn.active {
+      background: linear-gradient(135deg, #2dd4bf, #38bdf8);
+      color: #04151f;
+    }
+
+    .action-btn {
+      border: 1px solid #2d3e5c;
+      background: #141f33;
+      color: #e2e8f0;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4.5px 9px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .action-btn:hover {
+      border-color: #4b658f;
+      background: #1c2b45;
+    }
+
+    .action-btn.icon-only {
+      padding: 4.5px 8px;
+      min-width: 30px;
+    }
+
+    .action-btn.studio-btn {
+      background: linear-gradient(135deg, rgba(168, 85, 247, 0.25), rgba(244, 114, 182, 0.25));
+      border-color: rgba(244, 114, 182, 0.65);
+      color: #fbcfe8;
+    }
+
+    .action-btn.studio-btn.hidden {
+      display: none;
+    }
+
+    .action-btn.pause-btn {
+      background: rgba(245, 158, 11, 0.16);
+      border-color: rgba(245, 158, 11, 0.7);
+      color: #fbbf24;
+    }
+
+    .action-btn.serial-connected {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: var(--accent-green);
+      color: #34d399;
+    }
+
+    .action-btn.muted {
+      opacity: 0.55;
+      color: #94a3b8;
+    }
+
+    /* ==================== STAGE WRAPPER ==================== */
+    .stage-container {
+      flex: 1;
+      position: relative;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .view-layer {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .view-layer.hidden {
+      display: none !important;
+    }
+
+    /* ==================== MODE 1: FPGA PRO ENGINEERING VIEW ==================== */
+    .fpga-stage {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 0.92fr 1.28fr 1.05fr;
+      gap: 8px;
+      padding: 8px 12px;
+      min-height: 0;
+      background: #070d19;
+    }
+
+    .fpga-card {
+      background: #0e1628;
+      border: 1px solid #1e2d4a;
+      border-radius: 12px;
+      padding: 9px 10px;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .fpga-card-hd {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11.5px;
+      font-weight: 800;
+      color: #38bdf8;
+      margin-bottom: 7px;
+      padding-bottom: 5px;
+      border-bottom: 1px solid rgba(56, 189, 248, 0.14);
+    }
+
+    .fpga-tag {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: #7dd3fc;
+    }
+
+    .fpga-rig-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 0;
+    }
+
+    .fpga-depth-row {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: #cbd5e1;
+    }
+
+    .fpga-press-btn {
+      width: 100%;
+      border: none;
+      border-radius: 9px;
+      padding: 9px 10px;
+      background: linear-gradient(180deg, #ef4444, #b91c1c);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
+      transition: transform 0.05s;
+    }
+
+    .fpga-press-btn:active, .fpga-press-btn.pressed {
+      transform: scale(0.97);
+      filter: brightness(1.15);
+    }
+
+    .fpga-ldr-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin-top: 6px;
+    }
+
+    .fpga-ldr-row {
+      background: #09101f;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 6px 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10.5px;
+    }
+
+    .fpga-ldr-badge {
+      padding: 2px 7px;
+      border-radius: 6px;
+      font-weight: 800;
+      font-size: 10px;
+      background: #1e293b;
+      color: #94a3b8;
+    }
+
+    .fpga-ldr-badge.lit-top { background: rgba(250, 204, 21, 0.2); color: #fde047; border: 1px solid #facc15; }
+    .fpga-ldr-badge.lit-bot { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #10b981; }
+
+    .fpga-fault-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-top: 7px;
+    }
+
+    .fpga-fault-btn {
+      border-radius: 8px;
+      padding: 7px 6px;
+      font-size: 10.5px;
+      font-weight: 800;
+      cursor: pointer;
+      border: 1px solid;
+      background: transparent;
+      transition: filter 0.1s;
+    }
+
+    .fpga-fault-btn.shallow {
+      background: rgba(245, 158, 11, 0.14);
+      border-color: rgba(245, 158, 11, 0.6);
+      color: #fbbf24;
+    }
+
+    .fpga-fault-btn.recoil {
+      background: rgba(168, 85, 247, 0.15);
+      border-color: rgba(168, 85, 247, 0.6);
+      color: #c4b5fd;
+    }
+
+    /* Mode 1 Center */
+    .fpga-beat-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 5px;
+      margin: 6px 0;
+    }
+
+    .beat-box {
+      background: #09101f;
+      border: 1px solid #1e2d4a;
+      border-radius: 7px;
+      padding: 5px 4px;
+      text-align: center;
+      font-size: 10px;
+      font-weight: 800;
+      color: #64748b;
+      transition: all 0.08s;
+    }
+
+    .beat-box.active {
+      background: linear-gradient(135deg, #ef4444, #f97316);
+      border-color: #fb923c;
+      color: #ffffff;
+      box-shadow: 0 0 14px rgba(249, 115, 22, 0.55);
+    }
+
+    .fpga-pill-red {
+      background: rgba(239, 68, 68, 0.22);
+      border: 1px solid rgba(239, 68, 68, 0.65);
+      color: #fca5a5;
+      font-size: 10.5px;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+
+    .fpga-pill-blue {
+      background: rgba(56, 189, 248, 0.2);
+      border: 1px solid rgba(56, 189, 248, 0.6);
+      color: #7dd3fc;
+      font-size: 10.5px;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+
+    .fpga-time-bar-track {
+      height: 4px;
+      width: 100%;
+      background: #1e293b;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-bottom: 6px;
+    }
+
+    .fpga-time-bar-fill {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #ef4444, #38bdf8);
+      transition: width 0.1s linear;
+    }
+
+    .fpga-rig-inner-box {
+      flex: 1;
+      background: #09101f;
+      border: 1px solid #1e2d4a;
+      border-radius: 10px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-height: 0;
+    }
+
+    .fpga-canvas-hud {
+      position: absolute;
+      top: 10px;
+      left: 12px;
+      right: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      pointer-events: none;
+      z-index: 6;
+    }
+
+    .fpga-hud-score-lbl { font-size: 10px; font-weight: 700; color: #94a3b8; }
+    .fpga-hud-score-num { font-size: 20px; font-weight: 900; color: #ffffff; font-family: "Courier New", Consolas, monospace; letter-spacing: 1px; }
+    .fpga-hud-combo-lbl { font-size: 10px; font-weight: 800; color: #facc15; text-align: right; }
+    .fpga-hud-combo-num { font-size: 22px; font-weight: 900; color: #facc15; text-align: right; line-height: 1.05; }
+
+    .fpga-board-led-wrap {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 3px;
+      margin-bottom: 6px;
+    }
+
+    .fpga-board-led-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .fpga-board-led-col .mini-led {
+      width: 100%;
+      height: 11px;
+    }
+
+    .fpga-board-led-num {
+      font-size: 8px;
+      color: #64748b;
+      font-family: monospace;
+    }
+
+    .fpga-ecg-hd {
+      position: absolute;
+      top: 3px;
+      left: 7px;
+      right: 7px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 9.5px;
+      font-weight: 700;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    .fpga-uart-hd {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 9.5px;
+      color: #94a3b8;
+      margin-bottom: 3px;
+      font-weight: 700;
+    }
+
+    .fpga-fault-label {
+      font-size: 9.5px;
+      color: #94a3b8;
+      margin-top: 6px;
+      margin-bottom: 3px;
+      font-weight: 700;
+    }
+
+    .fpga-tempo-bar {
+      margin-top: 6px;
+      background: #09101f;
+      border: 1px solid #1e2d4a;
+      border-radius: 8px;
+      padding: 6px 8px;
+    }
+
+    .tempo-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 9.5px;
+      font-weight: 700;
+      color: #94a3b8;
+      margin-bottom: 4px;
+    }
+
+    .tempo-track {
+      position: relative;
+      height: 10px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #ef4444 0%, #f59e0b 28%, #10b981 35%, #10b981 65%, #f59e0b 72%, #ef4444 100%);
+    }
+
+    .tempo-needle {
+      position: absolute;
+      top: -3px;
+      left: 50%;
+      width: 6px;
+      height: 16px;
+      border-radius: 3px;
+      background: #ffffff;
+      box-shadow: 0 0 8px #ffffff;
+      transform: translateX(-50%);
+      transition: left 0.15s ease-out;
+    }
+
+    /* Mode 1 Right Split */
+    .fpga-right-col {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 0;
+    }
+
+    .fpga-right-col .fpga-card {
+      flex: 1;
+    }
+
+    .fpga-ecg-box {
+      height: 76px;
+      background: #060b14;
+      border: 1px solid rgba(16, 185, 129, 0.28);
+      border-radius: 8px;
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 6px;
+    }
+
+    .fpga-bars-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .fpga-mini-bar-card {
+      background: #09101f;
+      border: 1px solid #1e2d4a;
+      border-radius: 7px;
+      padding: 5px 7px;
+      font-size: 10px;
+    }
+
+    .mini-progress {
+      height: 5px;
+      border-radius: 999px;
+      background: #1e293b;
+      margin-top: 4px;
+      overflow: hidden;
+    }
+
+    .mini-progress-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.2s;
+    }
+
+    .fpga-stat-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+    }
+
+    .fpga-stat-cell {
+      background: #09101f;
+      border: 1px solid #1e2d4a;
+      border-radius: 7px;
+      padding: 4px 2px;
+      text-align: center;
+    }
+
+    .fpga-stat-cell span { display: block; font-size: 9px; font-weight: 700; }
+    .fpga-stat-cell strong { display: block; font-size: 14px; font-weight: 900; color: #fff; margin-top: 1px; }
+
+    /* 7-Segment & UART Terminal */
+    .fpga-hw-top {
+      display: grid;
+      grid-template-columns: 1.05fr 1fr;
+      gap: 7px;
+      margin-bottom: 6px;
+    }
+
+    .seven-seg-box {
+      background: #180608;
+      border: 1px solid #450a0a;
+      border-radius: 8px;
+      padding: 6px 8px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .seven-seg-label {
+      font-size: 9.5px;
+      color: #fca5a5;
+      margin-bottom: 2px;
+    }
+
+    .seven-seg-digits {
+      font-family: "Courier New", Consolas, monospace;
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: 4px;
+      color: #ff2e2e;
+      text-shadow: 0 0 12px rgba(255, 46, 46, 0.85);
+      line-height: 1.1;
+    }
+
+    .uart-code-box {
+      background: #09101f;
+      border: 1px solid #1e2d4a;
+      border-radius: 8px;
+      padding: 5px 8px;
+      font-size: 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .uart-code-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #cbd5e1;
+      padding: 1px 0;
+    }
+
+    .uart-dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #334155;
+      margin-right: 4px;
+    }
+
+    .uart-dot.on-p { background: #10b981; box-shadow: 0 0 8px #10b981; }
+    .uart-dot.on-s { background: #f59e0b; box-shadow: 0 0 8px #f59e0b; }
+    .uart-dot.on-e { background: #a855f7; box-shadow: 0 0 8px #a855f7; }
+
+    .uart-terminal {
+      flex: 1;
+      min-height: 46px;
+      background: #040811;
+      border: 1px solid #1e2d4a;
+      border-radius: 8px;
+      padding: 5px 8px;
+      font-family: "Courier New", Consolas, monospace;
+      font-size: 10px;
+      color: #34d399;
+      overflow-y: auto;
+      line-height: 1.38;
+      margin-top: 6px;
+    }
+
+    .fpga-shortcut-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 14px;
+      background: #0c1424;
+      border-top: 1px solid #1e2d4a;
+      font-size: 10.5px;
+      color: #94a3b8;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .fpga-shortcut-bar kbd {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 4px;
+      padding: 1px 5px;
+      color: #38bdf8;
+      font-weight: 800;
+      font-size: 10px;
+      margin-right: 3px;
+    }
+
+    /* ==================== MODE 2: HOSPITAL ARCADE VIEW (CUSTOMIZABLE) ==================== */
+    .arcade-stage {
+      flex: 1;
+      position: relative;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 10px 14px 10px;
+      gap: 8px;
+      background-color: #dbeafe;
+      background-image: url('hospital_bg.jpg');
+      background-size: cover;
+      background-position: center;
+      overflow: hidden;
+      transition: box-shadow 0.3s ease;
+    }
+
+    .arcade-stage.fever-on {
+      box-shadow: inset 0 0 40px rgba(244, 114, 182, 0.5), inset 0 0 18px rgba(56, 189, 248, 0.55);
+    }
+
+    .arcade-stage.hit-shake {
+      animation: microShake 0.11s ease-out;
+    }
+
+    @keyframes microShake {
+      0% { transform: translate(0, 0); }
+      35% { transform: translate(0, 2px); }
+      70% { transform: translate(0, -1px); }
+      100% { transform: translate(0, 0); }
+    }
+
+    .arcade-hud-top {
+      display: grid;
+      grid-template-columns: 1.25fr 1.05fr 0.95fr;
+      gap: 10px;
+      z-index: 6;
+    }
+
+    .hud-pill {
+      background: var(--hud-glass);
+      border: 1px solid var(--hud-border);
+      border-radius: 14px;
+      padding: 8px 14px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 6px 20px rgba(15, 23, 42, 0.28);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 48px;
+      min-width: 0;
+    }
+
+    .hud-vital-icon {
+      font-size: 18px;
+      line-height: 1;
+      flex-shrink: 0;
+      filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.6));
+    }
+
+    .hud-vital-pct {
+      font-size: 17px;
+      font-weight: 900;
+      color: #fb7185;
+      min-width: 44px;
+      font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
+    }
+
+    .vital-bar-track {
+      position: relative;
+      flex: 1;
+      height: 11px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.78);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      overflow: hidden;
+    }
+
+    .vital-bar-fill {
+      height: 100%;
+      width: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #ef4444 0%, #f59e0b 45%, #10b981 80%, #38bdf8 100%);
+      transition: width 0.18s ease-out;
+      box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
+    }
+
+    .vital-threshold-mark {
+      position: absolute;
+      left: 80%;
+      top: -1px;
+      bottom: -1px;
+      width: 2.5px;
+      background: #fde047;
+      box-shadow: 0 0 6px #fde047;
+      z-index: 2;
+    }
+
+    .hud-center-pill {
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .hud-timer-wrap {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 16px;
+      font-weight: 900;
+      color: #fde047;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .score-number {
+      font-size: 21px;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+      color: #ffffff;
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 1px 10px rgba(56, 189, 248, 0.45);
+    }
+
+    .rank-badge {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: 900;
+      flex-shrink: 0;
+    }
+
+    .rank-badge.rank-s { background: linear-gradient(135deg, #fde047, #f59e0b); color: #1c1000; box-shadow: 0 0 14px rgba(250, 204, 21, 0.65); }
+    .rank-badge.rank-a { background: linear-gradient(135deg, #34d399, #059669); color: #022c22; box-shadow: 0 0 12px rgba(16, 185, 129, 0.55); }
+    .rank-badge.rank-b { background: linear-gradient(135deg, #38bdf8, #2563eb); color: #041226; box-shadow: 0 0 12px rgba(56, 189, 248, 0.5); }
+    .rank-badge.rank-c { background: linear-gradient(135deg, #fb923c, #ea580c); color: #ffffff; box-shadow: 0 0 12px rgba(249, 115, 22, 0.55); }
+    .rank-badge.rank-f { background: linear-gradient(135deg, #f87171, #dc2626); color: #ffffff; box-shadow: 0 0 12px rgba(239, 68, 68, 0.6); }
+    .rank-badge.rank-none { background: rgba(30, 41, 59, 0.9); color: #94a3b8; border: 1px solid #475569; box-shadow: none; }
+
+    .hud-hw-pill {
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .mini-led-strip {
+      display: flex;
+      gap: 3px;
+      align-items: center;
+      flex: 1;
+    }
+
+    .mini-led {
+      flex: 1;
+      height: 14px;
+      border-radius: 3px;
+      background: rgba(15, 23, 42, 0.78);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      transition: background 0.05s, box-shadow 0.05s;
+    }
+
+    .mini-led.on-low { background: #38bdf8; box-shadow: 0 0 7px #38bdf8; border-color: #7dd3fc; }
+    .mini-led.on-mid { background: #facc15; box-shadow: 0 0 7px #facc15; border-color: #fef08a; }
+    .mini-led.on-high { background: #10b981; box-shadow: 0 0 8px #10b981; border-color: #6ee7b7; }
+    .mini-led.on-peak { background: #ef4444; box-shadow: 0 0 10px #ef4444; border-color: #fca5a5; }
+
+    .mini-ldr-circles {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-shrink: 0;
+    }
+
+    .ldr-circle {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1.5px solid rgba(148, 163, 184, 0.35);
+      color: #94a3b8;
+      font-size: 9px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.08s;
+    }
+
+    .ldr-circle.lit-top { background: #facc15; border-color: #fef08a; color: #1c1000; box-shadow: 0 0 10px rgba(250, 204, 21, 0.8); }
+    .ldr-circle.lit-bot { background: #10b981; border-color: #6ee7b7; color: #022c22; box-shadow: 0 0 10px rgba(16, 185, 129, 0.8); }
+
+    .arcade-showcase-row {
+      flex: 1.05;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 0.78fr 1.65fr 0.82fr;
+      align-items: center;
+      gap: 10px;
+      z-index: 5;
+      padding: 0 4px;
+    }
+
+    .floating-heart-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      height: 100%;
+      min-height: 0;
+    }
+
+    .heart-core-img {
+      max-height: 76%;
+      max-width: 148px;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      transition: transform 0.08s cubic-bezier(0.22, 1, 0.36, 1), filter 0.12s;
+      filter: drop-shadow(0 6px 14px rgba(15, 23, 42, 0.42));
+    }
+
+    .heart-core-img.pumping {
+      transform: scale(0.84);
+      filter: drop-shadow(0 0 22px rgba(239, 68, 68, 0.85)) brightness(1.14);
+    }
+
+    .heart-bpm-pill {
+      background: rgba(15, 23, 42, 0.86);
+      border: 1.5px solid rgba(56, 189, 248, 0.5);
+      border-radius: 999px;
+      padding: 4px 14px;
+      font-size: 13px;
+      font-weight: 900;
+      color: #e0f2fe;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.32);
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .ecg-screen-wrap {
+      height: 88%;
+      max-height: 190px;
+      min-height: 108px;
+      width: 100%;
+      position: relative;
+      border-radius: 16px;
+      background: rgba(18, 30, 44, 0.80);
+      border: 1.5px solid rgba(52, 211, 153, 0.42);
+      box-shadow: 0 10px 26px rgba(15, 23, 42, 0.30);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      overflow: hidden;
+    }
+
+    .combo-overlay-badge {
+      position: absolute;
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      text-align: right;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    .combo-big-num {
+      font-size: 40px;
+      font-weight: 900;
+      line-height: 0.95;
+      color: #f472b6;
+      text-shadow: 0 2px 16px rgba(244, 114, 182, 0.78);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .combo-big-label {
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 1.8px;
+      color: #e2e8f0;
+      margin-top: 2px;
+    }
+
+    .floating-nurse-col {
+      position: relative;
+      height: 100%;
+      min-height: 0;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+
+    .nurse-companion-img {
+      max-height: 98%;
+      max-width: 100%;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      filter: drop-shadow(0 6px 14px rgba(15, 23, 42, 0.32));
+      transition: transform 0.1s;
+    }
+
+    .nurse-companion-img.cheer-bounce {
+      transform: translateY(-7px) scale(1.05);
+    }
+
+    img[src*="nurse_start.gif"]:not(.studio-thumb-char),
+    img[src*="Bonus1.GIF" i]:not(.studio-thumb-char) {
+      cursor: pointer;
+    }
+
+    .nurse-bubble-icon {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 2.5px solid #38bdf8;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      z-index: 4;
+      transition: transform 0.12s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .nurse-bubble-icon.pop {
+      transform: scale(1.2) rotate(-6deg);
+    }
+
+    .arcade-track-card {
+      flex: 0.88;
+      min-height: 108px;
+      background: rgba(11, 18, 32, 0.88);
+      border: 1.5px solid rgba(56, 189, 248, 0.34);
+      border-radius: 16px;
+      position: relative;
+      z-index: 6;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 8px 26px rgba(15, 23, 42, 0.38);
+      overflow: hidden;
+      display: flex;
+    }
+
+    .track-corner-badges {
+      position: absolute;
+      top: 8px;
+      right: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      z-index: 8;
+      pointer-events: none;
+    }
+
+    .track-bpm-pill {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 11px;
+      font-weight: 800;
+      color: #e0f2fe;
+    }
+
+    .fever-pill {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 10.5px;
+      font-weight: 900;
+      background: linear-gradient(90deg, #a855f7, #ec4899, #f59e0b);
+      color: #fff;
+      opacity: 0;
+      transform: scale(0.8);
+      transition: all 0.2s;
+    }
+
+    .fever-pill.active {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    /* ==================== MODE 3: CLASSIC v2 VIEW ==================== */
+    .main-stage {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1.05fr 1.35fr 1fr;
+      gap: 8px;
+      padding: 8px 12px;
+      min-height: 0;
+      background: #0b1120;
+    }
+
+    .card {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card-header {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .hw-visual-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      gap: 8px;
+      min-height: 0;
+    }
+
+    .bellows-svg-box {
+      width: 100%;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: visible;
+    }
+
+    .bellows-svg-box svg {
+      width: 100%;
+      height: 100%;
+      max-width: 310px;
+      max-height: 196px;
+      overflow: visible;
+    }
+
+    .pump-rig {
+      position: relative;
+      width: 100px;
+      height: 130px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .red-pad {
+      width: 76px;
+      height: 16px;
+      background: linear-gradient(180deg, #f87171, #dc2626);
+      border-radius: 6px 6px 2px 2px;
+      border: 1px solid #fca5a5;
+      z-index: 3;
+      transition: transform 0.06s ease-out;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+    }
+
+    .yellow-bellows {
+      width: 68px;
+      height: 80px;
+      background: repeating-linear-gradient(
+        180deg,
+        #facc15 0px,
+        #eab308 10px,
+        #ca8a04 14px,
+        #fde047 18px
+      );
+      border-radius: 4px;
+      transform-origin: bottom center;
+      transition: transform 0.06s ease-out;
+    }
+
+    .blue-base {
+      width: 96px;
+      height: 14px;
+      background: #0284c7;
+      border-radius: 4px;
+      position: relative;
+    }
+
+    .sensor-pillar {
+      position: absolute;
+      right: 4px;
+      bottom: 14px;
+      width: 16px;
+      height: 98px;
+      background: #0369a1;
+      border-radius: 4px 4px 0 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 6px 2px;
+      align-items: center;
+    }
+
+    .ldr-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+      background: #312e81;
+      border: 1px solid #818cf8;
+      transition: all 0.08s;
+    }
+
+    .ldr-dot.lit {
+      background: #fde047;
+      box-shadow: 0 0 8px #fde047;
+      border-color: #fff;
+    }
+
+    .ldr-status-list {
+      font-size: 10px;
+      line-height: 1.45;
+      color: var(--text-muted);
+    }
+
+    .led-tower {
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 3px;
+      background: #090d16;
+      padding: 5px;
+      border-radius: 8px;
+      border: 1px solid #1e293b;
+      height: 130px;
+      justify-content: space-between;
+    }
+
+    .led-cell {
+      width: 16px;
+      height: 6px;
+      border-radius: 2px;
+      background: #1e293b;
+      transition: background 0.04s, box-shadow 0.04s;
+    }
+
+    .led-cell.on-low { background: #38bdf8; box-shadow: 0 0 6px #38bdf8; }
+    .led-cell.on-mid { background: #facc15; box-shadow: 0 0 6px #facc15; }
+    .led-cell.on-high { background: #10b981; box-shadow: 0 0 8px #10b981; }
+    .led-cell.on-peak { background: #ef4444; box-shadow: 0 0 10px #ef4444; }
+
+    .canvas-container {
+      flex: 1;
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      background: transparent;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    #classicView .canvas-container,
+    #fpgaView .canvas-container {
+      background: #070b14;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .judgment-toast {
+      position: absolute;
+      top: 22%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.95);
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      text-shadow: 0 2px 14px rgba(0,0,0,0.92);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.14s, transform 0.14s;
+      white-space: nowrap;
+      z-index: 9;
+    }
+
+    .judgment-toast.show {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1.06);
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      flex: 1;
+    }
+
+    .metric-box {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 6px 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .metric-label { font-size: 10px; color: var(--text-muted); }
+    .metric-val { font-size: 18px; font-weight: 800; line-height: 1.15; margin-top: 2px; }
+    .metric-sub { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+    /* ==================== TOUCH DECK ==================== */
+    .touch-deck {
+      display: grid;
+      grid-template-columns: 0.9fr 1.9fr 0.9fr;
+      gap: 10px;
+      padding: 9px 14px 11px;
+      background: #0c1424;
+      border-top: 1px solid rgba(56, 189, 248, 0.18);
+      z-index: 25;
+    }
+
+    .touch-deck.hidden {
+      display: none;
+    }
+
+    .touch-btn {
+      border: none;
+      border-radius: 13px;
+      font-weight: 900;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 8px;
+      cursor: pointer;
+      transition: transform 0.05s, filter 0.05s, box-shadow 0.08s;
+    }
+
+    .touch-btn:active, .touch-btn.pressed {
+      transform: scale(0.97);
+      filter: brightness(1.16);
+    }
+
+    .btn-shallow {
+      background: linear-gradient(180deg, #ea8c00, #b45309);
+      font-size: 13px;
+      border: 1px solid rgba(253, 224, 71, 0.35);
+    }
+
+    .btn-main-press {
+      background: linear-gradient(180deg, #ef4444, #c81e1e);
+      box-shadow: 0 4px 18px rgba(239, 68, 68, 0.42);
+      font-size: 16px;
+      border: 1px solid rgba(254, 202, 202, 0.48);
+    }
+
+    .btn-main-press.pressed {
+      box-shadow: 0 0 28px rgba(248, 113, 113, 0.85);
+    }
+
+    .btn-recoil {
+      background: linear-gradient(180deg, #8b5cf6, #6d28d9);
+      font-size: 13px;
+      border: 1px solid rgba(196, 181, 253, 0.38);
+    }
+
+    .btn-hint {
+      font-size: 10px;
+      font-weight: 600;
+      opacity: 0.9;
+      margin-top: 2px;
+    }
+
+    /* ==================== STUDIO MODAL (MODE 2 BG & CHAR CUSTOMIZER) ==================== */
+    .studio-modal-card {
+      max-width: 560px;
+      max-height: 88vh;
+      overflow-y: auto;
+      text-align: left;
+    }
+
+    .studio-section-title {
+      font-size: 12.5px;
+      font-weight: 800;
+      color: #7dd3fc;
+      margin: 10px 0 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .studio-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .studio-option {
+      background: #162236;
+      border: 2px solid #2b3a55;
+      border-radius: 10px;
+      padding: 6px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      color: #cbd5e1;
+      font-size: 11px;
+      font-weight: 700;
+      transition: all 0.15s;
+    }
+
+    .studio-option:hover {
+      border-color: #60a5fa;
+      color: #fff;
+    }
+
+    .studio-option.active {
+      border-color: #38bdf8;
+      background: rgba(56, 189, 248, 0.16);
+      color: #fff;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
+    }
+
+    .studio-thumb-bg {
+      width: 100%;
+      aspect-ratio: 16 / 10;
+      border-radius: 6px;
+      object-fit: cover;
+      background: #0b1120;
+    }
+
+    .studio-thumb-char {
+      width: 64px;
+      height: 64px;
+      border-radius: 8px;
+      object-fit: contain;
+      background: rgba(255,255,255,0.06);
+      padding: 3px;
+    }
+
+    .studio-upload-label {
+      background: rgba(168, 85, 247, 0.14);
+      border: 2px dashed rgba(168, 85, 247, 0.55);
+      border-radius: 10px;
+      padding: 6px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      color: #e9d5ff;
+      font-size: 11px;
+      font-weight: 700;
+      text-align: center;
+      transition: all 0.15s;
+    }
+
+    .studio-upload-label:hover {
+      background: rgba(168, 85, 247, 0.25);
+      border-color: #c084fc;
+    }
+
+    .studio-upload-label input[type="file"] {
+      display: none;
+    }
+
+    /* ==================== MODALS & TOAST ==================== */
+    .sys-toast {
+      position: fixed;
+      top: 64px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-10px);
+      background: rgba(15, 23, 42, 0.96);
+      border: 1px solid #38bdf8;
+      color: #e0f2fe;
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-size: 12.5px;
+      font-weight: 700;
+      z-index: 200;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s, transform 0.2s;
+      box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55);
+      max-width: 90vw;
+      text-align: center;
+    }
+
+    .sys-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(3, 7, 18, 0.84);
+      backdrop-filter: blur(7px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 16px;
+    }
+
+    .modal-overlay.hidden { display: none; }
+
+    .modal-card {
+      background: #0f172a;
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 18px;
+      max-width: 480px;
+      width: 100%;
+      padding: 20px;
+      text-align: center;
+      box-shadow: 0 24px 50px rgba(0,0,0,0.72);
+      position: relative;
+      overflow: visible;
+    }
+
+    .result-avatar-box {
+      width: 220px;
+      height: 180px;
+      margin: -28px auto 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .result-avatar-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.6));
+    }
+
+    .start-hero-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin: -8px auto 8px;
+    }
+
+    .start-avatar-box { width: 126px; height: 112px; display: flex; align-items: center; justify-content: center; }
+    .start-avatar-box img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45)); }
+    .start-heart-box { width: 82px; height: 82px; display: flex; align-items: center; justify-content: center; }
+    .start-heart-box img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 14px rgba(56, 189, 248, 0.55)); }
+
+    @keyframes nursePopOut {
+      0% { opacity: 0; transform: translateY(38px) scale(0.6); }
+      65% { opacity: 1; transform: translateY(-10px) scale(1.07); }
+      85% { transform: translateY(3px) scale(0.98); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .nurse-pop { animation: nursePopOut 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+    .modal-title { font-size: 18.5px; font-weight: 900; color: var(--accent-blue); margin-bottom: 6px; }
+    .modal-desc { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 12px; }
+
+    .mode-select-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 7px;
+      margin-bottom: 14px;
+    }
+
+    .mode-choice-btn {
+      background: #162236;
+      border: 1.5px solid #2b3a55;
+      border-radius: 11px;
+      padding: 9px 7px;
+      color: #cbd5e1;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s;
+    }
+
+    .mode-choice-btn.selected {
+      background: rgba(56, 189, 248, 0.16);
+      border-color: #38bdf8;
+      color: #fff;
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.25);
+    }
+
+    .mode-choice-title { font-size: 11.5px; font-weight: 800; margin-bottom: 3px; display: block; }
+    .mode-choice-sub { font-size: 10px; color: #94a3b8; line-height: 1.3; display: block; }
+
+    .result-score-banner {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 8px 14px;
+      margin-bottom: 10px;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+      margin-bottom: 12px;
+      text-align: left;
+    }
+
+    .summary-item { background: #1e293b; padding: 7px 10px; border-radius: 8px; font-size: 11px; color: #94a3b8; }
+    .summary-item strong { display: block; font-size: 14.5px; color: #fff; margin-top: 2px; }
+
+    .modal-actions { display: flex; flex-direction: column; gap: 8px; }
+    .modal-actions-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+    .modal-btn {
+      width: 100%;
+      padding: 10px;
+      border-radius: 10px;
+      border: none;
+      font-size: 13.5px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: filter 0.12s;
+    }
+
+    .modal-btn:hover { filter: brightness(1.08); }
+    .modal-btn-primary { background: var(--accent-green); color: #052e16; }
+    .modal-btn-secondary { background: #334155; color: #f3f4f6; }
+    .modal-btn-amber { background: var(--accent-amber); color: #1f1300; }
+
+    @media (max-width: 900px) {
+      .fpga-stage { grid-template-columns: 1fr 1fr; overflow-y: auto; }
+      .fpga-right-col { grid-column: 1 / -1; }
+      .arcade-hud-top { grid-template-columns: 1fr 1fr; }
+      .hud-hw-pill { grid-column: 1 / -1; min-height: 36px; padding: 5px 12px; }
+      .studio-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 768px) and (orientation: portrait) {
+      .main-stage { grid-template-columns: 1fr 1fr; grid-template-rows: 1.15fr 0.85fr; }
+      .center-panel { grid-column: 1 / -1; order: -1; }
+      .arcade-showcase-row { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 0.9fr; }
+      .ecg-screen-wrap { grid-column: 1 / -1; order: 2; height: 100%; }
+      .mode-select-cards { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sys-toast" id="sysToast">提示訊息</div>
+
+  <div class="app-shell">
+    <header class="top-bar">
+      <div class="top-bar-header">
+        <div class="brand-title">
+          <span>🫀 黃金四分鐘 CPR</span>
+          <span class="badge-ver">v3 三模式整合版</span>
+        </div>
+        <div style="font-size:11px; color:#64748b; font-weight:700;">
+          BEST <span id="hudBestScore" style="color:#fde047;">0</span>
+        </div>
+      </div>
+
+      <div class="controls-row">
+        <!-- 3 Visual Modes Switcher -->
+        <div class="pill-group view-group" id="viewModeGroup" title="切換三種介面模式 (熱鍵 V)">
+          <button class="pill-btn" data-view="fpga">⚙️ 模式一 FPGA</button>
+          <button class="pill-btn active" data-view="arcade">🏥 模式二 遊戲</button>
+          <button class="pill-btn" data-view="classic">📱 模式三 經典</button>
+        </div>
+
+        <!-- Mode 2 Customizer Button -->
+        <button class="action-btn studio-btn" id="btnOpenStudio" title="自訂模式二的背景與陪伴角色">🎨 換背景/角色</button>
+
+        <div class="pill-group" id="modeGroup">
+          <button class="pill-btn active" data-mode="game">🎮 節奏</button>
+          <button class="pill-btn" data-mode="empty">🩺 空壓</button>
+        </div>
+
+        <div class="pill-group" id="timeGroup">
+          <button class="pill-btn" data-sec="10">10s</button>
+          <button class="pill-btn active" data-sec="30">30s</button>
+          <button class="pill-btn" data-sec="60">60s</button>
+          <button class="pill-btn" data-sec="0">∞</button>
+        </div>
+
+        <div class="pill-group" id="bpmGroup">
+          <button class="pill-btn" data-bpm="100">100</button>
+          <button class="pill-btn active" data-bpm="110">110</button>
+          <button class="pill-btn" data-bpm="120">120</button>
+          <button class="pill-btn" data-bpm="range">100~120</button>
+        </div>
+
+        <button class="action-btn icon-only" id="btnMute" title="開關音效 (熱鍵 M)">🔊</button>
+        <button class="action-btn" id="btnSerial" title="連接 EGO1 FPGA USB-UART (115200 baud)">🔌 FPGA</button>
+        <button class="action-btn icon-only" id="btnFullscreen" title="切換全螢幕">⛶</button>
+        <button class="action-btn pause-btn" id="btnPause" title="暫停 (熱鍵 P)">⏸ 暫停</button>
+      </div>
+    </header>
+
+    <div class="stage-container">
+      <!-- ==================== MODE 1: FPGA PRO ENGINEERING DASHBOARD (ORIGINAL UI) ==================== -->
+      <div class="view-layer hidden" id="fpgaView">
+        <div class="fpga-stage">
+          <!-- Left: 1. Physical Sensor & Dual LDR -->
+          <section class="fpga-card">
+            <div class="fpga-card-hd">
+              <span>● 1. 物理感測端 (雙 LDR 偵測)</span>
+              <span class="fpga-tag">J 字型單氣流側柱</span>
+            </div>
+
+            <div class="fpga-rig-inner-box">
+              <div class="fpga-depth-row">
+                <span>按壓深度: <strong id="fpgaDepthVal" style="color:#38bdf8; font-size:13px;">0.0 cm</strong></span>
+                <span class="fpga-tag" id="fpgaRecoilTag" style="color:#34d399; border-color:rgba(16,185,129,0.4);">完全回彈 (頂端)</span>
+              </div>
+
+              <div class="fpga-rig-area">
+                <div class="bellows-svg-box">
+                <svg viewBox="0 0 340 218" xmlns="http://www.w3.org/2000/svg" aria-label="CPR波紋氣囊與雙LDR導軌模型">
+                  <defs>
+                    <linearGradient id="fpgaSvgGold" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stop-color="#c27803"/>
+                      <stop offset="22%" stop-color="#facc15"/>
+                      <stop offset="48%" stop-color="#fef08a"/>
+                      <stop offset="76%" stop-color="#eab308"/>
+                      <stop offset="100%" stop-color="#a16207"/>
+                    </linearGradient>
+                    <linearGradient id="fpgaSvgRed" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stop-color="#ef4444"/>
+                      <stop offset="100%" stop-color="#b91c1c"/>
+                    </linearGradient>
+                    <linearGradient id="fpgaSvgBlue" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stop-color="#0284c7"/>
+                      <stop offset="100%" stop-color="#0369a1"/>
+                    </linearGradient>
+                    <filter id="fpgaSvgGlow" x="-60%" y="-60%" width="220%" height="220%">
+                      <feGaussianBlur stdDeviation="2.4" result="blur"/>
+                      <feMerge>
+                        <feMergeNode in="blur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                      </feMerge>
+                    </filter>
+                  </defs>
+
+                  <!-- 0cm 回彈參考線 -->
+                  <line x1="14" y1="36" x2="232" y2="36" stroke="#475569" stroke-width="1" stroke-dasharray="3,3"/>
+                  <text x="14" y="31" fill="#94a3b8" font-size="9.5" font-weight="700">0cm(回彈)</text>
+
+                  <!-- 5~6cm 達標區間背景帶 -->
+                  <rect x="22" y="108" width="204" height="26" fill="rgba(16, 185, 129, 0.13)" stroke="rgba(16, 185, 129, 0.55)" stroke-width="1" stroke-dasharray="4,3" rx="3"/>
+                  <text x="16" y="124" fill="#34d399" font-size="9.5" font-weight="800">5~6cm達標</text>
+
+                  <!-- 黃色波紋風箱氣囊 (以底部 y=192 為縮放軸心) -->
+                  <g id="fpgaYellowBellows" transform="translate(0, 0)">
+                    <polygon
+                      points="72,38 198,38 214,53 196,68 214,83 196,98 214,113 196,128 214,143 196,158 214,173 198,192 72,192 56,173 74,158 56,143 74,128 56,113 74,98 56,83 74,68 56,53"
+                      fill="url(#fpgaSvgGold)"
+                      stroke="#92400e"
+                      stroke-width="1.2"
+                      stroke-linejoin="round"
+                    />
+                  </g>
+
+                  <!-- 加厚手壓板 (直接遮光) -->
+                  <g id="fpgaRedPad" transform="translate(0, 0)">
+                    <ellipse cx="135" cy="24" rx="68" ry="6" fill="#d97706" stroke="#fde047" stroke-width="0.9"/>
+                    <rect x="54" y="24" width="162" height="23" rx="5" fill="url(#fpgaSvgRed)" stroke="#fca5a5" stroke-width="1.3"/>
+                    <text x="135" y="39" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="900">加厚手壓板 (直接遮光)</text>
+                  </g>
+
+                  <!-- 底座左側紅藍氣閥 -->
+                  <rect x="44" y="178" width="16" height="12" rx="3" fill="#dc2626" stroke="#fca5a5" stroke-width="0.9"/>
+                  <rect x="61" y="182" width="16" height="11" rx="3" fill="#2563eb" stroke="#93c5fd" stroke-width="0.9"/>
+
+                  <!-- 藍色 3D 列印底座與右側雙 LDR 導軌柱 -->
+                  <path d="M 32,192 L 222,192 L 222,22 Q 222,16 228,16 L 252,16 Q 258,16 258,22 L 258,210 L 32,210 Z" fill="url(#fpgaSvgBlue)" stroke="#38bdf8" stroke-width="1.2"/>
+
+                  <!-- 導軌內側暗槽 -->
+                  <rect x="224" y="26" width="10" height="162" rx="2" fill="#0f172a"/>
+
+                  <!-- 上 LDR (紫色外殼 + 狀態燈點) -->
+                  <g>
+                    <rect x="230" y="28" width="18" height="18" rx="4" fill="#a855f7" stroke="#e9d5ff" stroke-width="1.4"/>
+                    <circle id="fpgaTopLdrDot" cx="239" cy="37" r="4.5" fill="#1e293b"/>
+                  </g>
+                  <text x="266" y="34" fill="#f8fafc" font-size="11.5" font-weight="900">上LDR</text>
+                  <text x="266" y="48" id="fpgaSvgTopTxt" fill="#f87171" font-size="10.5" font-weight="800">遮光(0)</text>
+
+                  <!-- 5~6cm 距離標線 -->
+                  <line x1="250" y1="50" x2="250" y2="112" stroke="#94a3b8" stroke-width="1"/>
+                  <text x="256" y="85" fill="#e2e8f0" font-size="10.5" font-weight="800">5~6cm</text>
+
+                  <!-- 下 LDR (紫色外殼 + 狀態燈點) -->
+                  <g>
+                    <rect x="230" y="114" width="18" height="18" rx="4" fill="#a855f7" stroke="#e9d5ff" stroke-width="1.4"/>
+                    <circle id="fpgaBotLdrDot" cx="239" cy="123" r="4.5" fill="#facc15" filter="url(#fpgaSvgGlow)"/>
+                  </g>
+                  <text x="266" y="120" fill="#f8fafc" font-size="11.5" font-weight="900">下LDR</text>
+                  <text x="266" y="134" id="fpgaSvgBotTxt" fill="#cbd5e1" font-size="10.5" font-weight="800">待命(1)</text>
+                </svg>
+              </div>
+              </div>
+
+              <button class="fpga-press-btn" id="fpgaMainPressBtn">👆 按壓 [空白鍵 Space] (壓下上升 / 放開下降)</button>
+            </div>
+
+            <div class="fpga-ldr-cards">
+              <div class="fpga-ldr-row">
+                <div>
+                  <strong style="color:#f8fafc;">🔴 上 LDR (與頂端齊平)</strong>
+                  <div style="font-size:9.5px; color:#64748b;">偵測胸廓是否完全回彈</div>
+                </div>
+                <span class="fpga-ldr-badge" id="fpgaTopLdrBadge">遮光 = 0 (已回彈)</span>
+              </div>
+              <div class="fpga-ldr-row">
+                <div>
+                  <strong style="color:#f8fafc;">🟡 下 LDR (下方 5~6cm)</strong>
+                  <div style="font-size:9.5px; color:#64748b;">偵測按壓深度是否達標</div>
+                </div>
+                <span class="fpga-ldr-badge" id="fpgaBotLdrBadge">見光 = 1 (待觸發)</span>
+              </div>
+            </div>
+
+            <div class="fpga-fault-label">專題防呆測試 (模擬異常按壓):</div>
+            <div class="fpga-fault-row" style="margin-top:0;">
+              <button class="fpga-fault-btn shallow" id="fpgaShallowBtn">⚠️ [S鍵] 按壓過淺</button>
+              <button class="fpga-fault-btn recoil" id="fpgaRecoilBtn">🚫 [E鍵] 未完全回彈</button>
+            </div>
+          </section>
+
+          <!-- Center: Original Vertical Falling Rhythm Lane + LED Bar + 4-Beat Strip + Tempo Gauge -->
+          <section class="fpga-card">
+            <div class="fpga-card-hd" style="border-bottom:none; padding-bottom:2px; margin-bottom:4px;">
+              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                <span class="fpga-pill-red" id="fpgaBpmBadge">110 BPM 模式</span>
+                <span class="fpga-pill-blue" id="fpgaDurBadge">30秒 模式</span>
+                <span id="fpgaCenterTitle" style="color:#94a3b8; font-size:11px; font-weight:700;">黃金急救標準律動</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:5px;">
+                <span style="font-size:10px; color:#94a3b8;">剩餘時間</span>
+                <span id="fpgaTimerDisplay" style="color:#38bdf8; font-weight:900; font-family:monospace; font-size:13.5px;">00:30.0</span>
+              </div>
+            </div>
+            <div class="fpga-time-bar-track"><div class="fpga-time-bar-fill" id="fpgaTimeProgressBar"></div></div>
+
+            <div style="display:flex; justify-content:space-between; font-size:10px; color:#94a3b8; margin-bottom:3px;">
+              <span>📊 LED 霹靂燈按壓回饋 (壓下上升 ▲ / 回彈下降 ▼)</span>
+              <span id="fpgaLedCountTxt" style="color:#38bdf8; font-weight:800;">完全回彈 ▼ (0/12 燈 | 0.0 cm)</span>
+            </div>
+            <div class="mini-led-strip" id="fpgaTopLedStrip" style="flex:0 0 auto; margin-bottom:2px;"></div>
+
+            <div class="fpga-beat-strip">
+              <div class="beat-box" id="beatBox0">BEAT 1 (壓)</div>
+              <div class="beat-box" id="beatBox1">BEAT 2 (壓)</div>
+              <div class="beat-box" id="beatBox2">BEAT 3 (壓)</div>
+              <div class="beat-box" id="beatBox3">BEAT 4 (壓)</div>
+            </div>
+
+            <div class="canvas-container">
+              <div class="fpga-canvas-hud" id="fpgaCanvasHud">
+                <div>
+                  <div class="fpga-hud-score-lbl">SCORE 總積分</div>
+                  <div class="fpga-hud-score-num" id="fpgaScoreVal">000000</div>
+                </div>
+                <div>
+                  <div class="fpga-hud-combo-lbl">COMBO 連擊</div>
+                  <div class="fpga-hud-combo-num" id="fpgaComboVal">0</div>
+                </div>
+              </div>
+              <canvas id="fpgaStageCanvas"></canvas>
+              <div class="judgment-toast" id="fpgaToast" style="top:54%;">PERFECT!</div>
+            </div>
+
+            <div class="fpga-tempo-bar">
+              <div class="tempo-labels">
+                <span style="color:#86efac;">⚡ 過慢 (&lt;100 BPM)</span>
+                <span id="fpgaTempoStatusTxt" style="color:#fde047;">當下按壓頻率: <strong id="fpgaLiveBpm">-- BPM</strong></span>
+                <span style="color:#fbbf24;">過快 (&gt;120 BPM) ⚡</span>
+              </div>
+              <div class="tempo-track">
+                <div class="tempo-needle" id="fpgaTempoNeedle"></div>
+              </div>
+              <div style="text-align:center; font-size:9px; color:#64748b; margin-top:3px;">100 ~ 110 ~ 120 BPM 黃金區</div>
+            </div>
+          </section>
+
+          <!-- Right: 3. Physiology Monitor + 2. Artix-7 FPGA Hardware Panel -->
+          <div class="fpga-right-col">
+            <section class="fpga-card">
+              <div class="fpga-card-hd">
+                <span>● 3. 病患生理監視與統計</span>
+                <span class="fpga-tag" id="fpgaAccBadge" style="color:#34d399; border-color:rgba(16,185,129,0.4);">目前準確率 100% (≥80% 達標)</span>
+              </div>
+
+              <div class="fpga-ecg-box">
+                <div class="fpga-ecg-hd">
+                  <span style="color:#34d399;">📈 ECG 心電圖即時波形</span>
+                  <span id="fpgaEcgStatusTxt" style="color:#34d399;">正常人工循環波形 (有效灌流)</span>
+                </div>
+                <canvas id="fpgaEcgCanvas"></canvas>
+              </div>
+
+              <div class="fpga-bars-grid">
+                <div class="fpga-mini-bar-card">
+                  <div style="display:flex; justify-content:space-between;">
+                    <span style="color:#94a3b8;">病患血氧 (SpO₂)</span>
+                    <strong id="fpgaSpo2Val" style="color:#38bdf8;">88%</strong>
+                  </div>
+                  <div class="mini-progress">
+                    <div class="mini-progress-fill" id="fpgaSpo2Bar" style="width:88%; background:#38bdf8;"></div>
+                  </div>
+                </div>
+                <div class="fpga-mini-bar-card">
+                  <div style="display:flex; justify-content:space-between;">
+                    <span style="color:#94a3b8;">Perfect/Good 率</span>
+                    <strong id="fpgaPgRateVal" style="color:#facc15;">100%</strong>
+                  </div>
+                  <div class="mini-progress">
+                    <div class="mini-progress-fill" id="fpgaPgRateBar" style="width:100%; background:#facc15;"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="fpga-stat-4">
+                <div class="fpga-stat-cell"><span style="color:#34d399;">PERFECT</span><strong id="fpgaCntPerf">0</strong></div>
+                <div class="fpga-stat-cell"><span style="color:#38bdf8;">GOOD</span><strong id="fpgaCntGood">0</strong></div>
+                <div class="fpga-stat-cell"><span style="color:#f87171;">MISS (節奏)</span><strong id="fpgaCntMiss">0</strong></div>
+                <div class="fpga-stat-cell"><span style="color:#fbbf24;">過淺/未回彈</span><strong id="fpgaCntFault">0</strong></div>
+              </div>
+            </section>
+
+            <section class="fpga-card">
+              <div class="fpga-card-hd">
+                <span>▣ 2. Artix-7 FPGA 硬體回饋面板</span>
+                <span class="fpga-tag">XC7A35T</span>
+              </div>
+
+              <div class="fpga-hw-top">
+                <div class="seven-seg-box">
+                  <div class="seven-seg-label">七段顯示器 (有效按壓計數)</div>
+                  <div class="seven-seg-digits" id="fpgaSevenSeg">0000</div>
+                </div>
+                <div class="uart-code-box">
+                  <div style="font-size:9.5px; color:#94a3b8; font-weight:700; margin-bottom:2px;">狀態指示燈與 UART 編碼:</div>
+                  <div class="uart-code-row"><span><i class="uart-dot" id="uartDotP"></i>標準 ('P')</span><strong style="color:#34d399;">0x50</strong></div>
+                  <div class="uart-code-row"><span><i class="uart-dot" id="uartDotS"></i>過淺 ('S')</span><strong style="color:#fbbf24;">0x53</strong></div>
+                  <div class="uart-code-row"><span><i class="uart-dot" id="uartDotE"></i>未回彈 ('E')</span><strong style="color:#c4b5fd;">0x45</strong></div>
+                </div>
+              </div>
+
+              <div style="display:flex; justify-content:space-between; font-size:9.5px; color:#94a3b8; margin-bottom:3px;">
+                <span>⚡ 板載 LED 霹靂燈 (LD0 → LD11 壓下上升 / 回彈下降)</span>
+                <span id="fpgaBoardLedTxt" style="color:#38bdf8; font-weight:700;">回彈歸零: 0.0 cm (0/12)</span>
+              </div>
+              <div class="fpga-board-led-wrap" id="fpgaBoardLedStrip"></div>
+
+              <div class="fpga-uart-hd">
+                <span>&gt;_ UART 115200 訊號監聽紀錄</span>
+                <span id="fpgaFsmStatus" style="color:#38bdf8; font-family:monospace;">FSM: S_READY_TOP</span>
+              </div>
+              <div class="uart-terminal" id="uartTerminal">
+                <div>[SYSTEM] FSM: S_READY_TOP | UART 115200 監聽就緒...</div>
+              </div>
+            </section>
+          </div>
+        </div>
+        <div class="fpga-shortcut-bar">
+          <div>⌨️ 快捷鍵: <kbd>Space 空白鍵</kbd>按壓(壓下霹靂燈上升 / 放開下降) <kbd>S 鍵</kbd>模擬過淺 <kbd>E 鍵</kbd>模擬未回彈 <kbd>P / Esc</kbd>智慧暫停與結算 <kbd>V 鍵</kbd>切換三模式</div>
+          <div style="color:#94a3b8;">支援 100 / 110 / 120 BPM 模式 與 空壓測驗模式 (純紀錄BPM)</div>
+        </div>
+      </div>
+
+      <!-- ==================== MODE 2: BRIGHT HOSPITAL GAME VIEW (CUSTOMIZABLE) ==================== -->
+      <div class="view-layer" id="arcadeView">
+        <div class="arcade-stage" id="arcadeStage">
+          <!-- Row 1: 3 Sleek Floating Frosted HUD Pills -->
+          <div class="arcade-hud-top">
+            <div class="hud-pill">
+              <span class="hud-vital-icon">❤️</span>
+              <span class="hud-vital-pct" id="arcadeAccVal">100%</span>
+              <div class="vital-bar-track">
+                <div class="vital-bar-fill" id="vitalBarFill" style="width:100%;"></div>
+                <div class="vital-threshold-mark" title="80% 救援成功線"></div>
+              </div>
+            </div>
+
+            <div class="hud-pill hud-center-pill">
+              <div class="hud-timer-wrap">
+                <span>⏱</span>
+                <span id="arcadeTimerDisplay">30.0s</span>
+              </div>
+              <span class="score-number" id="hudScoreVal">00000</span>
+              <div class="rank-badge rank-none" id="hudRankBadge">-</div>
+            </div>
+
+            <div class="hud-pill hud-hw-pill">
+              <div class="mini-led-strip" id="miniLedStrip"></div>
+              <div class="mini-ldr-circles">
+                <span class="ldr-circle" id="miniTopLdr" title="上 LDR (回彈偵測)">▲</span>
+                <span class="ldr-circle" id="miniBotLdr" title="下 LDR (5~6cm 深度)">▼</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Row 2: Floating Heart + Center ECG Monitor + Floating Character -->
+          <div class="arcade-showcase-row">
+            <div class="floating-heart-col">
+              <img src="heart_pulse.gif" alt="脈動心臟" class="heart-core-img" id="heartCoreImg" />
+              <div class="heart-bpm-pill" id="arcadeBpmOverlay">-- BPM</div>
+            </div>
+
+            <div class="ecg-screen-wrap">
+              <canvas id="ecgCanvas"></canvas>
+              <div class="combo-overlay-badge">
+                <div class="combo-big-num" id="arcadeComboVal">0</div>
+                <div class="combo-big-label">COMBO</div>
+              </div>
+            </div>
+
+            <div class="floating-nurse-col">
+              <div class="nurse-bubble-icon" id="nurseBubbleIcon" title="準備好就開始救援！">💪</div>
+              <img src="nurse_start.gif" alt="急救陪伴角色" class="nurse-companion-img" id="arcadeNurseImg" />
+            </div>
+          </div>
+
+          <!-- Row 3: Sleek Dark Translucent Rhythm Track -->
+          <div class="arcade-track-card">
+            <div class="track-corner-badges">
+              <span class="fever-pill" id="feverBadge">🔥 FEVER x1.5</span>
+              <span class="track-bpm-pill" id="arcadeTrackTitle">🎯 110 BPM</span>
+            </div>
+            <div class="canvas-container">
+              <canvas id="arcadeCanvas"></canvas>
+              <div class="judgment-toast" id="arcadeToast">PERFECT!</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== MODE 3: CLASSIC v2 MONITOR VIEW ==================== -->
+      <div class="view-layer hidden" id="classicView">
+        <main class="main-stage">
+          <section class="card">
+            <div class="card-header">
+              <span>機構與雙 LDR</span>
+              <span>霹靂燈升降</span>
+            </div>
+            <div class="hw-visual-wrap">
+              <div class="bellows-svg-box">
+                <svg viewBox="0 0 340 218" xmlns="http://www.w3.org/2000/svg" aria-label="CPR波紋氣囊與雙LDR導軌模型">
+                  <defs>
+                    <linearGradient id="clsSvgGold" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stop-color="#c27803"/>
+                      <stop offset="22%" stop-color="#facc15"/>
+                      <stop offset="48%" stop-color="#fef08a"/>
+                      <stop offset="76%" stop-color="#eab308"/>
+                      <stop offset="100%" stop-color="#a16207"/>
+                    </linearGradient>
+                    <linearGradient id="clsSvgRed" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stop-color="#ef4444"/>
+                      <stop offset="100%" stop-color="#b91c1c"/>
+                    </linearGradient>
+                    <linearGradient id="clsSvgBlue" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stop-color="#0284c7"/>
+                      <stop offset="100%" stop-color="#0369a1"/>
+                    </linearGradient>
+                    <filter id="clsSvgGlow" x="-60%" y="-60%" width="220%" height="220%">
+                      <feGaussianBlur stdDeviation="2.4" result="blur"/>
+                      <feMerge>
+                        <feMergeNode in="blur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                      </feMerge>
+                    </filter>
+                  </defs>
+
+                  <!-- 0cm 回彈參考線 -->
+                  <line x1="14" y1="36" x2="232" y2="36" stroke="#475569" stroke-width="1" stroke-dasharray="3,3"/>
+                  <text x="14" y="31" fill="#94a3b8" font-size="9.5" font-weight="700">0cm(回彈)</text>
+
+                  <!-- 5~6cm 達標區間背景帶 -->
+                  <rect x="22" y="108" width="204" height="26" fill="rgba(16, 185, 129, 0.13)" stroke="rgba(16, 185, 129, 0.55)" stroke-width="1" stroke-dasharray="4,3" rx="3"/>
+                  <text x="16" y="124" fill="#34d399" font-size="9.5" font-weight="800">5~6cm達標</text>
+
+                  <!-- 黃色波紋風箱氣囊 (以底部 y=192 為縮放軸心) -->
+                  <g id="yellowBellows" transform="translate(0, 0)">
+                    <polygon
+                      points="72,38 198,38 214,53 196,68 214,83 196,98 214,113 196,128 214,143 196,158 214,173 198,192 72,192 56,173 74,158 56,143 74,128 56,113 74,98 56,83 74,68 56,53"
+                      fill="url(#clsSvgGold)"
+                      stroke="#92400e"
+                      stroke-width="1.2"
+                      stroke-linejoin="round"
+                    />
+                  </g>
+
+                  <!-- 加厚手壓板 (直接遮光) -->
+                  <g id="redPad" transform="translate(0, 0)">
+                    <ellipse cx="135" cy="24" rx="68" ry="6" fill="#d97706" stroke="#fde047" stroke-width="0.9"/>
+                    <rect x="54" y="24" width="162" height="23" rx="5" fill="url(#clsSvgRed)" stroke="#fca5a5" stroke-width="1.3"/>
+                    <text x="135" y="39" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="900">加厚手壓板 (直接遮光)</text>
+                  </g>
+
+                  <!-- 底座左側紅藍氣閥 -->
+                  <rect x="44" y="178" width="16" height="12" rx="3" fill="#dc2626" stroke="#fca5a5" stroke-width="0.9"/>
+                  <rect x="61" y="182" width="16" height="11" rx="3" fill="#2563eb" stroke="#93c5fd" stroke-width="0.9"/>
+
+                  <!-- 藍色 3D 列印底座與右側雙 LDR 導軌柱 -->
+                  <path d="M 32,192 L 222,192 L 222,22 Q 222,16 228,16 L 252,16 Q 258,16 258,22 L 258,210 L 32,210 Z" fill="url(#clsSvgBlue)" stroke="#38bdf8" stroke-width="1.2"/>
+
+                  <!-- 導軌內側暗槽 -->
+                  <rect x="224" y="26" width="10" height="162" rx="2" fill="#0f172a"/>
+
+                  <!-- 上 LDR (紫色外殼 + 狀態燈點) -->
+                  <g>
+                    <rect x="230" y="28" width="18" height="18" rx="4" fill="#a855f7" stroke="#e9d5ff" stroke-width="1.4"/>
+                    <circle id="topLdr" cx="239" cy="37" r="4.5" fill="#1e293b"/>
+                  </g>
+                  <text x="266" y="34" fill="#f8fafc" font-size="11.5" font-weight="900">上LDR</text>
+                  <text x="266" y="48" id="txtTopLdr" fill="#f87171" font-size="10.5" font-weight="800">遮光(0)</text>
+
+                  <!-- 5~6cm 距離標線 -->
+                  <line x1="250" y1="50" x2="250" y2="112" stroke="#94a3b8" stroke-width="1"/>
+                  <text x="256" y="85" fill="#e2e8f0" font-size="10.5" font-weight="800">5~6cm</text>
+
+                  <!-- 下 LDR (紫色外殼 + 狀態燈點) -->
+                  <g>
+                    <rect x="230" y="114" width="18" height="18" rx="4" fill="#a855f7" stroke="#e9d5ff" stroke-width="1.4"/>
+                    <circle id="botLdr" cx="239" cy="123" r="4.5" fill="#facc15" filter="url(#clsSvgGlow)"/>
+                  </g>
+                  <text x="266" y="120" fill="#f8fafc" font-size="11.5" font-weight="900">下LDR</text>
+                  <text x="266" y="134" id="txtBotLdr" fill="#cbd5e1" font-size="10.5" font-weight="800">待命(1)</text>
+                </svg>
+              </div>
+
+              <div class="led-tower" id="ledTower"></div>
+            </div>
+          </section>
+
+          <section class="card center-panel">
+            <div class="card-header">
+              <span id="centerTitle">🎵 節拍判定軌道 (目標: 110 BPM)</span>
+              <span id="timerDisplay" style="color:#38bdf8; font-weight:800;">剩餘 30.0s</span>
+            </div>
+            <div class="canvas-container">
+              <canvas id="stageCanvas"></canvas>
+              <div class="judgment-toast" id="judgmentToast">PERFECT!</div>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-header">
+              <span>📊 急救生理監視器</span>
+              <span id="statusTag" style="color:#10b981;">準備就緒</span>
+            </div>
+            <div class="metrics-grid">
+              <div class="metric-box">
+                <span class="metric-label">你的即時 BPM</span>
+                <span class="metric-val" id="liveBpmVal" style="color:#38bdf8;">--</span>
+                <span class="metric-sub">標準: 100~120</span>
+              </div>
+              <div class="metric-box">
+                <span class="metric-label">累計平均 BPM</span>
+                <span class="metric-val" id="avgBpmVal" style="color:#10b981;">--</span>
+                <span class="metric-sub" id="zoneRatioTxt">區間命中: 0%</span>
+              </div>
+              <div class="metric-box">
+                <span class="metric-label">有效按壓準確率</span>
+                <span class="metric-val" id="accVal" style="color:#facc15;">100%</span>
+                <span class="metric-sub">及格門檻: 80%</span>
+              </div>
+              <div class="metric-box">
+                <span class="metric-label">連續完美 (Combo)</span>
+                <span class="metric-val" id="comboVal" style="color:#f472b6;">0</span>
+                <span class="metric-sub" id="totalCountTxt">總按壓: 0 下</span>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <!-- Bottom Touch Controls (Used in Mode 2 & Mode 3) -->
+    <footer class="touch-deck" id="touchDeck">
+      <button class="touch-btn btn-shallow" id="touchShallow">
+        <span>⚠️ 過淺 (S)</span>
+        <span class="btn-hint">未達 5cm</span>
+      </button>
+
+      <button class="touch-btn btn-main-press" id="touchPress">
+        <span>🫀 按住按壓 / 放開回彈</span>
+        <span class="btn-hint">5~6cm 黃金深度 (Space)</span>
+      </button>
+
+      <button class="touch-btn btn-recoil" id="touchRecoil">
+        <span>⚠️ 未回彈 (E)</span>
+        <span class="btn-hint">上LDR未遮蔽</span>
+      </button>
+    </footer>
+  </div>
+
+  <!-- ==================== MODE 2 CUSTOMIZER STUDIO MODAL ==================== -->
+  <div class="modal-overlay hidden" id="studioModal">
+    <div class="modal-card studio-modal-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <div class="modal-title" style="margin:0;">🎨 模式二：自訂場景背景與角色</div>
+        <button class="action-btn" id="btnCloseStudio">✕ 關閉</button>
+      </div>
+      <p class="modal-desc" style="margin-bottom:8px;">
+        點擊即可即時套用內建場景與角色，也支援從本機上傳任意圖片或透明 GIF！
+      </p>
+
+      <div class="studio-section-title">
+        <span>🖼️ 選擇背景場景</span>
+        <span id="studioBgLabel" style="color:#94a3b8; font-size:11px;">目前：日間病房</span>
+      </div>
+      <div class="studio-grid" id="bgGridContainer">
+        <button class="studio-option active" data-bg-key="hospital" data-bg-label="日間病房">
+          <img class="studio-thumb-bg" src="hospital_bg.jpg" alt="日間病房" />
+          <span>🏥 日間病房</span>
+        </button>
+        <button class="studio-option" data-bg-key="ambulance" data-bg-label="夜間救護車">
+          <img class="studio-thumb-bg" src="ambulance_bg.jpg" alt="夜間救護車" />
+          <span>🚑 救護車內</span>
+        </button>
+        <button class="studio-option" data-bg-key="er" data-bg-label="科技急診室">
+          <img class="studio-thumb-bg" src="er_bg.jpg" alt="科技急診室" />
+          <span>🌃 科技急診</span>
+        </button>
+        <label class="studio-upload-label">
+          <span style="font-size:20px;">📂</span>
+          <span>上傳自訂背景</span>
+          <input type="file" id="uploadBgInput" accept="image/*" />
+        </label>
+      </div>
+
+      <div class="studio-section-title" style="margin-top:14px;">
+        <span>🌟 選擇打氣陪伴角色</span>
+        <span id="studioCharLabel" style="color:#94a3b8; font-size:11px;">目前：溫柔護理師</span>
+      </div>
+      <div class="studio-grid" id="charGridContainer">
+        <button class="studio-option active" data-char-key="nurse_start" data-char-label="溫柔護理師">
+          <img class="studio-thumb-char" src="nurse_start.gif" alt="溫柔護理師" />
+          <span>👩‍⚕️ 溫柔護理師</span>
+        </button>
+        <button class="studio-option" data-char-key="cheer1" data-char-label="啦啦隊 Cheer1">
+          <img class="studio-thumb-char" src="Cheer1.gif" alt="啦啦隊 Cheer1" />
+          <span>📣 啦啦隊 Cheer1</span>
+        </button>
+        <button class="studio-option" data-char-key="paramedic" data-char-label="熱血急救員">
+          <img class="studio-thumb-char" src="Cheer2.gif" alt="熱血急救員" />
+          <span>🩺 熱血急救員</span>
+        </button>
+        <button class="studio-option" data-char-key="medbot" data-char-label="資深醫師">
+          <img class="studio-thumb-char" src="Cheer3.gif" alt="資深醫師" />
+          <span>👨‍⚕️ 資深醫師</span>
+        </button>
+      </div>
+
+      <div style="margin-top:10px; display:flex; gap:8px; align-items:center;">
+        <label class="studio-upload-label" style="flex:1; flex-direction:row; padding:9px;">
+          <span>📂 上傳本機自訂角色圖片 / 透明 GIF</span>
+          <input type="file" id="uploadCharInput" accept="image/*" />
+        </label>
+        <button class="modal-btn modal-btn-primary" id="btnApplyStudio" style="width:auto; padding:10px 18px;">✅ 完成返回</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== START MODAL ==================== -->
+  <div class="modal-overlay" id="startModal">
+    <div class="modal-card">
+      <div class="start-hero-row">
+        <div class="start-avatar-box">
+          <img src="nurse_start.gif" alt="護理師" id="startNurseImg" />
+        </div>
+        <div class="start-heart-box">
+          <img src="heart_pulse.gif" alt="脈動心臟" id="startHeartImg" />
+        </div>
+      </div>
+      <div class="modal-title">🫀 CPR 節奏訓練系統 v3 三模式版</div>
+      <p class="modal-desc">
+        可任選三種展示介面（訓練中按 <strong>V</strong> 隨時切換），模式二支援自訂背景與角色！
+      </p>
+
+      <div class="mode-select-cards">
+        <button class="mode-choice-btn" data-pick-view="fpga">
+          <span class="mode-choice-title">⚙️ 模式一 FPGA</span>
+          <span class="mode-choice-sub">七段顯示器、UART 終端機、血氧與完整工程監控</span>
+        </button>
+        <button class="mode-choice-btn selected" data-pick-view="arcade">
+          <span class="mode-choice-title">🏥 模式二 遊戲</span>
+          <span class="mode-choice-sub">明亮醫院遊戲畫面，可自由切換背景與陪伴角色</span>
+        </button>
+        <button class="mode-choice-btn" data-pick-view="classic">
+          <span class="mode-choice-title">📱 模式三 經典</span>
+          <span class="mode-choice-sub">保留原本 v2 三欄式精簡氣囊機構與生理監視器</span>
+        </button>
+      </div>
+
+      <div class="modal-actions">
+        <button class="modal-btn modal-btn-primary" id="btnStartGame">▶️ 開始救援訓練 (解鎖音效)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== PAUSE MODAL ==================== -->
+  <div class="modal-overlay hidden" id="pauseModal">
+    <div class="modal-card">
+      <div class="modal-title" style="color:#fbbf24;">⏸ 訓練已暫停</div>
+      <p class="modal-desc" id="pauseGraceNote">
+        已自動檢查並扣除暫停前 1.25 秒因手部離開產生的 MISS 判定。
+      </p>
+      <div class="summary-grid">
+        <div class="summary-item">目前平均 BPM<strong id="pauseAvgBpm">--</strong></div>
+        <div class="summary-item">目前準確率<strong id="pauseAcc">100%</strong></div>
+        <div class="summary-item">目前分數<strong id="pauseScore">0</strong></div>
+        <div class="summary-item">最高連擊<strong id="pauseMaxCombo">0</strong></div>
+      </div>
+      <div class="modal-actions">
+        <button class="modal-btn modal-btn-primary" id="btnResume">▶️ 繼續訓練</button>
+        <button class="modal-btn modal-btn-amber" id="btnFinishNow">📊 立即結算成績</button>
+        <button class="modal-btn modal-btn-secondary" id="btnRestartFromPause">🔄 重新開始</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== RESULT MODAL ==================== -->
+  <div class="modal-overlay hidden" id="resultModal">
+    <div class="modal-card" id="resultCardStyle">
+      <div class="result-avatar-box" id="resultAvatarBorder">
+        <img id="resultNurseImg" src="nurse_fail.gif" alt="護理師結算動畫" />
+      </div>
+
+      <div class="result-score-banner">
+        <div class="rank-badge rank-s" id="resRankBadge">S</div>
+        <div style="text-align:left;">
+          <div style="font-size:10.5px; color:#94a3b8; font-weight:700;">FINAL SCORE</div>
+          <div style="font-size:22px; font-weight:900; color:#fff; line-height:1.1;" id="resScoreVal">0</div>
+        </div>
+        <div style="margin-left:auto; text-align:right;">
+          <div style="font-size:10.5px; color:#94a3b8;">最佳紀錄</div>
+          <div style="font-size:14px; font-weight:800; color:#fde047;" id="resBestVal">0</div>
+        </div>
+      </div>
+
+      <p class="modal-desc" id="resultSubtext">按壓深度與 100~120 BPM 節奏表現優異，成功維持腦部灌流！</p>
+      <div class="summary-grid">
+        <div class="summary-item">實測平均 BPM<strong id="resAvgBpm">--</strong></div>
+        <div class="summary-item">100~120 黃金區間<strong id="resZonePct">0%</strong></div>
+        <div class="summary-item">有效準確率 (門檻 80%)<strong id="resAcc">0%</strong></div>
+        <div class="summary-item">最高連擊 / 總按壓<strong id="resComboTotal">0 / 0</strong></div>
+        <div class="summary-item">Perfect / Good<strong id="resPG">0 / 0</strong></div>
+        <div class="summary-item">過淺 / 未回彈 / Miss<strong id="resErrors">0 / 0 / 0</strong></div>
+      </div>
+      <div class="modal-actions">
+        <div class="modal-actions-row">
+          <button class="modal-btn modal-btn-primary" id="btnPlayAgain">🔄 再測一次</button>
+          <button class="modal-btn modal-btn-secondary" id="btnSwitchAndPlay">🔀 切換下個模式重玩</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ==================== ASSET REGISTRY (RELATIVE FOR GITHUB, INLINED FOR CANVAS) ====================
+    const ASSET_PATHS = {
+      hospital: 'hospital_bg.jpg',
+      ambulance: 'ambulance_bg.jpg',
+      er: 'er_bg.jpg',
+      nurse_start: 'nurse_start.gif',
+      bonus1: 'Bonus1.GIF',
+      nurse_success: 'nurse_success.gif',
+      nurse_fail: 'nurse_fail.gif',
+      paramedic: 'Cheer2.gif',
+      medbot: 'Cheer3.gif',
+      cheer1: 'Cheer1.gif',
+      heart_pulse: 'heart_pulse.gif'
+    };
+
+    const svgFallbacks = {
+      nurse: "data:image/svg+xml;charset=utf-8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-size="60">👩‍⚕️</text></svg>'),
+      heart: "data:image/svg+xml;charset=utf-8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-size="60">🫀</text></svg>')
+    };
+
+    function attachFallback(id, kind) {
+      const img = document.getElementById(id);
+      if (!img) return;
+      img.addEventListener('error', () => {
+        if (!img.dataset.fallbackApplied) {
+          img.dataset.fallbackApplied = '1';
+          img.src = svgFallbacks[kind];
+        }
+      });
+    }
+    ['startNurseImg', 'arcadeNurseImg', 'resultNurseImg'].forEach(id => attachFallback(id, 'nurse'));
+
+    // Global Easter Egg: clicking nurse_start.gif on ANY screen switches to bonus1.gif (click again to toggle back)
+    document.addEventListener('click', (e) => {
+      const img = e.target && e.target.closest ? e.target.closest('img') : null;
+      if (!img || img.classList.contains('studio-thumb-char')) return;
+      const rawSrc = (img.getAttribute('src') || '') + ' ' + (img.src || '');
+      if (img.dataset.bonusActive === '1' || rawSrc.toLowerCase().includes('bonus1.gif')) {
+        delete img.dataset.fallbackApplied;
+        delete img.dataset.bonusActive;
+        img.src = ASSET_PATHS.nurse_start;
+      } else if (rawSrc.toLowerCase().includes('nurse_start.gif')) {
+        delete img.dataset.fallbackApplied;
+        img.dataset.bonusActive = '1';
+        img.src = ASSET_PATHS.bonus1;
+        if (img.id === 'arcadeNurseImg') {
+          img.classList.remove('cheer-bounce');
+          void img.offsetWidth;
+          img.classList.add('cheer-bounce');
+          setTimeout(() => img.classList.remove('cheer-bounce'), 180);
+        }
+      }
+    });
+    ['startHeartImg', 'heartCoreImg'].forEach(id => attachFallback(id, 'heart'));
+
+    // ==================== BUILD 12-LED ARRAYS ACROSS ALL 3 MODES ====================
+    function buildLedStrip(containerId, cellClass) {
+      const container = document.getElementById(containerId);
+      const list = [];
+      for (let i = 0; i < 12; i++) {
+        const cell = document.createElement('div');
+        cell.className = cellClass;
+        container.appendChild(cell);
+        list.push(cell);
+      }
+      return list;
+    }
+
+    const ledCells = buildLedStrip('ledTower', 'led-cell');
+    const miniLedCells = buildLedStrip('miniLedStrip', 'mini-led');
+    const fpgaTopLedCells = buildLedStrip('fpgaTopLedStrip', 'mini-led');
+    const fpgaBoardLedCells = (() => {
+      const el = document.getElementById('fpgaBoardLedStrip');
+      const arr = [];
+      for (let i = 0; i < 12; i++) {
+        const col = document.createElement('div');
+        col.className = 'fpga-board-led-col';
+        const cell = document.createElement('div');
+        cell.className = 'mini-led';
+        const lbl = document.createElement('span');
+        lbl.className = 'fpga-board-led-num';
+        lbl.textContent = String(i).padStart(2, '0');
+        col.appendChild(cell);
+        col.appendChild(lbl);
+        el.appendChild(col);
+        arr.push(cell);
+      }
+      return arr;
+    })();
+
+    // ==================== SAFE STORAGE ====================
+    function loadBestScore() {
+      try { return parseInt(localStorage.getItem('cpr_v3_best_score') || '0', 10) || 0; }
+      catch (e) { return 0; }
+    }
+    function saveBestScore(val) {
+      try { localStorage.setItem('cpr_v3_best_score', String(val)); } catch (e) {}
+    }
+
+    // ==================== GAME STATE ====================
+    const VIEW_ORDER = ['fpga', 'arcade', 'classic'];
+    const state = {
+      viewMode: 'arcade', // 'fpga' | 'arcade' | 'classic'
+      mode: 'game',       // 'game' | 'empty'
+      duration: 30,
+      bpmMode: '110',
+      muted: false,
+      running: false,
+      paused: false,
+      timeLeft: 30,
+      elapsed: 0,
+      isPressing: false,
+      holdType: 'normal',
+      ledLevel: 0,
+      lastPressTime: 0,
+      bpmList: [],
+      bpmHistory: [],
+      notes: [],
+      nextNoteTime: 0,
+      score: 0,
+      spo2: 88,
+      bestScore: loadBestScore(),
+      particles: [],
+      ripples: [],
+      ecgBuffer: new Array(160).fill(0),
+      ecgPulseQueue: 0,
+      stats: { perfect: 0, good: 0, shallow: 0, recoil: 0, miss: 0, combo: 0, maxCombo: 0 },
+      recentMisses: []
+    };
+
+    document.getElementById('hudBestScore').textContent = state.bestScore;
+
+    // ==================== SYSTEM TOAST & UART LOG ====================
+    let sysToastTimer = null;
+    function showSysToast(msg) {
+      const el = document.getElementById('sysToast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(sysToastTimer);
+      sysToastTimer = setTimeout(() => el.classList.remove('show'), 2400);
+    }
+
+    function appendUartLog(msg, color = '#34d399') {
+      const term = document.getElementById('uartTerminal');
+      if (!term) return;
+      const t = state.elapsed.toFixed(1).padStart(5, '0');
+      const line = document.createElement('div');
+      line.style.color = color;
+      line.textContent = `[${t}s] ${msg}`;
+      term.appendChild(line);
+      while (term.children.length > 28) term.removeChild(term.firstChild);
+      term.scrollTop = term.scrollHeight;
+    }
+
+    function flashUartDot(kind) {
+      const map = { P: ['uartDotP', 'on-p'], S: ['uartDotS', 'on-s'], E: ['uartDotE', 'on-e'] };
+      const pair = map[kind];
+      if (!pair) return;
+      const el = document.getElementById(pair[0]);
+      if (!el) return;
+      el.classList.add(pair[1]);
+      setTimeout(() => el.classList.remove(pair[1]), 220);
+    }
+
+    // ==================== WEB AUDIO SYNTHESIZER ====================
+    let audioCtx = null;
+    let beatStep = 0;
+
+    function unlockAudio() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) audioCtx = new AudioContextClass();
+      }
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function playBeatSound(isAccent) {
+      if (state.muted || !audioCtx || state.mode !== 'game') return;
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = isAccent ? 'triangle' : 'sine';
+      osc.frequency.setValueAtTime(isAccent ? 620 : 440, now);
+      osc.frequency.exponentialRampToValueAtTime(110, now + 0.09);
+      gain.gain.setValueAtTime(isAccent ? 0.2 : 0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.12);
+    }
+
+    function playHitSound(kind) {
+      if (state.muted || !audioCtx) return;
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const now = audioCtx.currentTime;
+      if (kind === 'perfect') {
+        [880, 1174.66].forEach((freq, idx) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.025);
+          gain.gain.setValueAtTime(0.13, now + idx * 0.025);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.025 + 0.11);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now + idx * 0.025);
+          osc.stop(now + idx * 0.025 + 0.12);
+        });
+      } else if (kind === 'good') {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(659.25, now);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.09);
+      } else {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(190, now);
+        osc.frequency.exponentialRampToValueAtTime(95, now + 0.14);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.16);
+      }
+    }
+
+    function playResultFanfare(isSuccess) {
+      if (state.muted || !audioCtx) return;
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const now = audioCtx.currentTime;
+      const notes = isSuccess ? [523.25, 659.25, 783.99, 1046.5] : [349.23, 311.13, 261.63];
+      notes.forEach((f, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = isSuccess ? 'triangle' : 'sawtooth';
+        const t = now + i * 0.11;
+        osc.frequency.setValueAtTime(f, t);
+        gain.gain.setValueAtTime(0.13, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(t);
+        osc.stop(t + 0.26);
+      });
+    }
+
+    // ==================== HELPER FUNCTIONS ====================
+    function getTargetBpm() {
+      if (state.bpmMode === 'range') {
+        if (state.bpmList.length > 0) {
+          const last = state.bpmList[state.bpmList.length - 1];
+          return Math.min(120, Math.max(100, last));
+        }
+        return 110;
+      }
+      return parseInt(state.bpmMode, 10);
+    }
+
+    function computeAccuracyAndTotal() {
+      const valid = state.stats.perfect + state.stats.good;
+      const total = valid + state.stats.shallow + state.stats.recoil + state.stats.miss;
+      const acc = total === 0 ? 100 : Math.round((valid / total) * 100);
+      return { valid, total, acc };
+    }
+
+    function computeRank(acc, total, isFinal = false) {
+      if (total === 0) return isFinal ? 'F' : '-';
+      if (isFinal && state.mode === 'game' && total < 5) return 'F';
+      if (acc >= 92 && state.stats.maxCombo >= 8 && (!isFinal || total >= 5)) return 'S';
+      if (acc >= 80) return 'A';
+      if (acc >= 65) return 'B';
+      if (acc >= 45) return 'C';
+      return 'F';
+    }
+
+    function spawnHitEffects(color, intensity = 16) {
+      const canvas = document.getElementById('arcadeCanvas');
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const hitX = Math.max(76, rect.width * 0.16);
+      const centerY = rect.height / 2;
+
+      state.ripples.push({ x: hitX, y: centerY, r: 20, maxR: 80, alpha: 0.95, color });
+      for (let i = 0; i < intensity; i++) {
+        const ang = (Math.PI * 2 * i) / intensity + (Math.random() - 0.5) * 0.4;
+        const spd = 70 + Math.random() * 190;
+        state.particles.push({
+          x: hitX, y: centerY,
+          vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
+          life: 0.45 + Math.random() * 0.25, maxLife: 0.7,
+          size: 2.5 + Math.random() * 3.5, color
+        });
+      }
+    }
+
+    let toastTimer = null;
+    function showJudgment(text, color) {
+      ['judgmentToast', 'arcadeToast', 'fpgaToast'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = text;
+        el.style.color = color;
+        el.classList.add('show');
+      });
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        ['judgmentToast', 'arcadeToast', 'fpgaToast'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.classList.remove('show');
+        });
+      }, 450);
+    }
+
+    function setNurseReaction(emoji, tip, bounce = false) {
+      const bubble = document.getElementById('nurseBubbleIcon');
+      const img = document.getElementById('arcadeNurseImg');
+      if (bubble) {
+        bubble.textContent = emoji;
+        bubble.title = tip;
+        bubble.classList.remove('pop');
+        void bubble.offsetWidth;
+        bubble.classList.add('pop');
+        setTimeout(() => bubble.classList.remove('pop'), 180);
+      }
+      if (bounce && img) {
+        img.classList.remove('cheer-bounce');
+        void img.offsetWidth;
+        img.classList.add('cheer-bounce');
+        setTimeout(() => img.classList.remove('cheer-bounce'), 180);
+      }
+    }
+
+    // ==================== HARDWARE VISUAL SYNC (ALL 3 MODES) ====================
+    function updateHardwareVisual(level) {
+      const ratio = Math.max(0, Math.min(1, level / 12));
+      const travelY = ratio * 86;
+      const scaleY = Math.max(0.42, (154 - travelY) / 154);
+      const depthCm = (ratio * 6.0).toFixed(1);
+
+      // Animate both Classic & FPGA SVG accordion bellows + red press pads
+      ['redPad', 'fpgaRedPad'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.setAttribute('transform', `translate(0, ${travelY.toFixed(1)})`);
+      });
+      ['yellowBellows', 'fpgaYellowBellows'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.setAttribute('transform', `translate(0, ${(192 * (1 - scaleY)).toFixed(1)}) scale(1, ${scaleY.toFixed(3)})`);
+      });
+
+      const topLit = level >= 2;
+      const botLit = level >= 10 && state.holdType !== 'shallow';
+
+      // Classic & FPGA SVG LDR dots & labels
+      const topLdr = document.getElementById('topLdr');
+      const botLdr = document.getElementById('botLdr');
+      const txtTop = document.getElementById('txtTopLdr');
+      const txtBot = document.getElementById('txtBotLdr');
+      const miniTop = document.getElementById('miniTopLdr');
+      const miniBot = document.getElementById('miniBotLdr');
+
+      const fpgaTopDot = document.getElementById('fpgaTopLdrDot');
+      const fpgaBotDot = document.getElementById('fpgaBotLdrDot');
+      const fpgaSvgTopTxt = document.getElementById('fpgaSvgTopTxt');
+      const fpgaSvgBotTxt = document.getElementById('fpgaSvgBotTxt');
+      const fpgaTopBadge = document.getElementById('fpgaTopLdrBadge');
+      const fpgaBotBadge = document.getElementById('fpgaBotLdrBadge');
+      const fpgaDepth = document.getElementById('fpgaDepthVal');
+      const fpgaRecoilTag = document.getElementById('fpgaRecoilTag');
+      const fpgaFsm = document.getElementById('fpgaFsmStatus');
+
+      fpgaDepth.textContent = `${depthCm} cm`;
+
+      if (topLit) {
+        if (topLdr) { topLdr.setAttribute('fill', '#facc15'); topLdr.setAttribute('filter', 'url(#clsSvgGlow)'); }
+        if (fpgaTopDot) { fpgaTopDot.setAttribute('fill', '#facc15'); fpgaTopDot.setAttribute('filter', 'url(#fpgaSvgGlow)'); }
+        if (txtTop) { txtTop.textContent = '見光(1)'; txtTop.setAttribute('fill', '#fde047'); }
+        if (fpgaSvgTopTxt) { fpgaSvgTopTxt.textContent = '見光(1)'; fpgaSvgTopTxt.setAttribute('fill', '#fde047'); }
+        miniTop.classList.add('lit-top');
+        fpgaTopBadge.textContent = '見光 = 1 (下壓中)';
+        fpgaTopBadge.className = 'fpga-ldr-badge lit-top';
+      } else {
+        if (topLdr) { topLdr.setAttribute('fill', '#1e293b'); topLdr.removeAttribute('filter'); }
+        if (fpgaTopDot) { fpgaTopDot.setAttribute('fill', '#1e293b'); fpgaTopDot.removeAttribute('filter'); }
+        if (txtTop) { txtTop.textContent = '遮光(0)'; txtTop.setAttribute('fill', '#f87171'); }
+        if (fpgaSvgTopTxt) { fpgaSvgTopTxt.textContent = '遮光(0)'; fpgaSvgTopTxt.setAttribute('fill', '#f87171'); }
+        miniTop.classList.remove('lit-top');
+        fpgaTopBadge.textContent = '遮光 = 0 (已回彈)';
+        fpgaTopBadge.className = 'fpga-ldr-badge';
+      }
+
+      if (botLit) {
+        if (botLdr) { botLdr.setAttribute('fill', '#10b981'); botLdr.setAttribute('filter', 'url(#clsSvgGlow)'); }
+        if (fpgaBotDot) { fpgaBotDot.setAttribute('fill', '#10b981'); fpgaBotDot.setAttribute('filter', 'url(#fpgaSvgGlow)'); }
+        if (txtBot) { txtBot.textContent = '達標(0)'; txtBot.setAttribute('fill', '#34d399'); }
+        if (fpgaSvgBotTxt) { fpgaSvgBotTxt.textContent = '達標(0)'; fpgaSvgBotTxt.setAttribute('fill', '#34d399'); }
+        miniBot.classList.add('lit-bot');
+        fpgaBotBadge.textContent = '遮光達標 = 0 (5~6cm)';
+        fpgaBotBadge.className = 'fpga-ldr-badge lit-bot';
+        fpgaRecoilTag.textContent = '深度達標 (5~6cm)';
+        fpgaFsm.textContent = 'FSM: S_DEPTH_OK';
+      } else {
+        if (botLdr) { botLdr.setAttribute('fill', '#facc15'); botLdr.setAttribute('filter', 'url(#clsSvgGlow)'); }
+        if (fpgaBotDot) { fpgaBotDot.setAttribute('fill', '#facc15'); fpgaBotDot.setAttribute('filter', 'url(#fpgaSvgGlow)'); }
+        if (txtBot) { txtBot.textContent = '待命(1)'; txtBot.setAttribute('fill', '#cbd5e1'); }
+        if (fpgaSvgBotTxt) { fpgaSvgBotTxt.textContent = '待命(1)'; fpgaSvgBotTxt.setAttribute('fill', '#cbd5e1'); }
+        miniBot.classList.remove('lit-bot');
+        fpgaBotBadge.textContent = '待命 = 1 (未達 5cm)';
+        fpgaBotBadge.className = 'fpga-ldr-badge';
+        fpgaRecoilTag.textContent = topLit ? '按壓行程中' : '完全回彈 (頂端)';
+        fpgaFsm.textContent = topLit ? 'FSM: S_PRESSING' : 'FSM: S_READY_TOP';
+      }
+
+      const litCount = Math.round(level);
+      const dirTxt = state.isPressing ? '壓下上升 ▲' : '完全回彈 ▼';
+      document.getElementById('fpgaLedCountTxt').textContent = `${dirTxt} (${litCount}/12 燈 | ${depthCm} cm)`;
+      document.getElementById('fpgaBoardLedTxt').textContent = `${state.isPressing ? '下壓中' : '回彈歸零'}: ${depthCm} cm (${litCount}/12)`;
+
+      for (let i = 0; i < 12; i++) {
+        let cls = '';
+        if (i < litCount) {
+          if (i < 4) cls = 'on-low';
+          else if (i < 8) cls = 'on-mid';
+          else if (i < 11) cls = 'on-high';
+          else cls = 'on-peak';
+        }
+        ledCells[i].className = 'led-cell' + (cls ? ' ' + cls : '');
+        miniLedCells[i].className = 'mini-led' + (cls ? ' ' + cls : '');
+        fpgaTopLedCells[i].className = 'mini-led' + (cls ? ' ' + cls : '');
+        fpgaBoardLedCells[i].className = 'mini-led' + (cls ? ' ' + cls : '');
+      }
+    }
+
+    // ==================== PRESS INPUT & JUDGMENT ====================
+    function triggerPressDown(type = 'normal') {
+      unlockAudio();
+      if (!state.running || state.paused || state.isPressing) return;
+
+      state.isPressing = true;
+      state.holdType = type;
+      const now = performance.now() / 1000;
+
+      const heartImg = document.getElementById('heartCoreImg');
+      if (heartImg) heartImg.classList.add('pumping');
+
+      const arcadeStage = document.getElementById('arcadeStage');
+      if (state.viewMode === 'arcade' && arcadeStage) {
+        arcadeStage.classList.remove('hit-shake');
+        void arcadeStage.offsetWidth;
+        arcadeStage.classList.add('hit-shake');
+      }
+
+      if (type === 'shallow') {
+        state.stats.shallow++;
+        state.stats.combo = 0;
+        state.spo2 = Math.max(75, state.spo2 - 1);
+        playHitSound('bad');
+        spawnHitEffects('#f59e0b', 10);
+        showJudgment('⚠️ 按壓過淺 (<5cm)', '#f59e0b');
+        setNurseReaction('💦', '再壓深一點！需要達到 5~6 cm！');
+        flashUartDot('S');
+        appendUartLog("UART TX -> 0x53 ('S') SHALLOW_ERR", '#fbbf24');
+        updateStatsUI();
+        return;
+      }
+
+      if (type === 'recoil') {
+        state.stats.recoil++;
+        state.stats.combo = 0;
+        state.spo2 = Math.max(75, state.spo2 - 1);
+        playHitSound('bad');
+        spawnHitEffects('#a855f7', 10);
+        showJudgment('⚠️ 回彈不全!', '#a855f7');
+        setNurseReaction('✋', '手掌要完全放鬆讓胸廓回彈！');
+        flashUartDot('E');
+        appendUartLog("UART TX -> 0x45 ('E') RECOIL_ERR", '#c4b5fd');
+        updateStatsUI();
+        return;
+      }
+
+      let instantBpm = null;
+      if (state.lastPressTime > 0) {
+        const dt = now - state.lastPressTime;
+        if (dt > 0.25 && dt < 2.0) {
+          instantBpm = Math.round(60 / dt);
+          state.bpmList.push(instantBpm);
+          state.bpmHistory.push({ t: state.elapsed, bpm: instantBpm });
+          if (state.bpmHistory.length > 45) state.bpmHistory.shift();
+        }
+      }
+      state.lastPressTime = now;
+
+      state.ecgPulseQueue = 1.0;
+      flashUartDot('P');
+      appendUartLog(`UART TX -> 0x50 ('P') DEPTH_OK${instantBpm ? ' | ' + instantBpm + ' BPM' : ''}`, '#34d399');
+
+      if (state.mode === 'empty') {
+        state.stats.perfect++;
+        state.stats.combo++;
+        state.stats.maxCombo = Math.max(state.stats.maxCombo, state.stats.combo);
+        state.score += 100;
+        state.spo2 = Math.min(99, state.spo2 + 1);
+        playHitSound('perfect');
+        if (instantBpm) {
+          const inZone = instantBpm >= 100 && instantBpm <= 120;
+          spawnHitEffects(inZone ? '#10b981' : '#38bdf8', 14);
+          showJudgment(inZone ? `${instantBpm} BPM (黃金區間)` : `${instantBpm} BPM`, inZone ? '#10b981' : '#38bdf8');
+          setNurseReaction(inZone ? '💖' : '⚡', inZone ? '落在 100~120 BPM 黃金區間！' : '調整節奏靠近 100~120 BPM', inZone);
+        } else {
+          spawnHitEffects('#38bdf8', 12);
+          showJudgment('開始計頻...', '#38bdf8');
+          setNurseReaction('💪', '持續按壓測節奏！');
+        }
+        updateStatsUI();
+        return;
+      }
+
+      let bestNote = null;
+      let minDiff = Infinity;
+      for (const note of state.notes) {
+        if (!note.hit && !note.missed) {
+          const diff = Math.abs(note.targetTime - state.elapsed);
+          if (diff < minDiff) {
+            minDiff = diff;
+            bestNote = note;
+          }
+        }
+      }
+
+      const feverMult = state.stats.combo >= 10 ? 1.5 : 1.0;
+
+      if (bestNote && minDiff <= 0.22) {
+        bestNote.hit = true;
+        if (minDiff <= 0.10) {
+          state.stats.perfect++;
+          state.stats.combo++;
+          state.spo2 = Math.min(99, state.spo2 + 1);
+          const pts = Math.round(100 * feverMult);
+          state.score += pts;
+          playHitSound('perfect');
+          spawnHitEffects('#10b981', state.stats.combo >= 10 ? 22 : 16);
+          showJudgment(`PERFECT! +${pts}`, '#10b981');
+          if (state.stats.combo >= 10) setNurseReaction('🔥', `🔥 ${state.stats.combo} 連擊 FEVER！`, true);
+          else if (state.stats.combo >= 5) setNurseReaction('💖', '節奏超穩！繼續保持！', true);
+          else setNurseReaction('✨', '精準按壓！', true);
+        } else {
+          state.stats.good++;
+          state.stats.combo++;
+          state.spo2 = Math.min(98, state.spo2 + 0.5);
+          const pts = Math.round(60 * feverMult);
+          state.score += pts;
+          playHitSound('good');
+          spawnHitEffects('#38bdf8', 12);
+          const hint = bestNote.targetTime > state.elapsed ? `GOOD (略快) +${pts}` : `GOOD (略慢) +${pts}`;
+          showJudgment(hint, '#38bdf8');
+          setNurseReaction('👍', '不錯喔！再準一點就 PERFECT！');
+        }
+        state.stats.maxCombo = Math.max(state.stats.maxCombo, state.stats.combo);
+      } else if (state.bpmMode === 'range' && instantBpm && instantBpm >= 100 && instantBpm <= 120) {
+        state.stats.perfect++;
+        state.stats.combo++;
+        state.stats.maxCombo = Math.max(state.stats.maxCombo, state.stats.combo);
+        state.spo2 = Math.min(99, state.spo2 + 1);
+        const pts = Math.round(100 * feverMult);
+        state.score += pts;
+        playHitSound('perfect');
+        spawnHitEffects('#10b981', 16);
+        showJudgment(`PERFECT (${instantBpm} BPM) +${pts}`, '#10b981');
+        setNurseReaction('💖', '黃金 100~120 BPM 穩定輸出！', true);
+      } else {
+        state.stats.miss++;
+        state.recentMisses.push({ time: state.elapsed, prevCombo: state.stats.combo });
+        state.stats.combo = 0;
+        state.spo2 = Math.max(75, state.spo2 - 1);
+        playHitSound('bad');
+        spawnHitEffects('#ef4444', 10);
+        showJudgment('節奏偏差 MISS', '#ef4444');
+        setNurseReaction('⚠️', '抓準發光圓環的節拍再按！');
+      }
+
+      updateStatsUI();
+    }
+
+    function triggerPressRelease() {
+      state.isPressing = false;
+      const heartImg = document.getElementById('heartCoreImg');
+      if (heartImg) heartImg.classList.remove('pumping');
+    }
+
+    // ==================== STATS & HUD UPDATE (ALL 3 MODES) ====================
+    function updateStatsUI() {
+      const liveEl = document.getElementById('liveBpmVal');
+      const avgEl = document.getElementById('avgBpmVal');
+      const zoneEl = document.getElementById('zoneRatioTxt');
+      const accEl = document.getElementById('accVal');
+      const comboEl = document.getElementById('comboVal');
+      const totalEl = document.getElementById('totalCountTxt');
+
+      let latestStr = '--';
+      let latestNum = 110;
+      let zonePct = 0;
+
+      if (state.bpmList.length > 0) {
+        const latest = state.bpmList[state.bpmList.length - 1];
+        const sum = state.bpmList.reduce((a, b) => a + b, 0);
+        const avg = Math.round(sum / state.bpmList.length);
+        const inZoneCount = state.bpmList.filter(b => b >= 100 && b <= 120).length;
+        zonePct = Math.round((inZoneCount / state.bpmList.length) * 100);
+
+        latestStr = String(latest);
+        latestNum = latest;
+        liveEl.textContent = latest;
+        liveEl.style.color = (latest >= 100 && latest <= 120) ? '#10b981' : '#f59e0b';
+        avgEl.textContent = avg;
+        zoneEl.textContent = `區間命中: ${zonePct}%`;
+      } else {
+        liveEl.textContent = '--';
+        avgEl.textContent = '--';
+        zoneEl.textContent = '區間命中: 0%';
+      }
+
+      const { valid, total, acc } = computeAccuracyAndTotal();
+      accEl.textContent = `${acc}%`;
+      accEl.style.color = acc >= 80 ? '#10b981' : '#ef4444';
+      comboEl.textContent = state.stats.combo;
+      totalEl.textContent = `總按壓: ${total} 下`;
+
+      // Mode 2 Arcade HUD
+      const displayAcc = total === 0 && state.running ? 0 : acc;
+      const arcAccEl = document.getElementById('arcadeAccVal');
+      arcAccEl.textContent = `${displayAcc}%`;
+      arcAccEl.style.color = displayAcc >= 80 ? '#34d399' : '#fb7185';
+      document.getElementById('vitalBarFill').style.width = `${Math.max(3, displayAcc)}%`;
+      document.getElementById('hudScoreVal').textContent = String(state.score).padStart(5, '0');
+      document.getElementById('arcadeComboVal').textContent = state.stats.combo;
+      document.getElementById('arcadeBpmOverlay').textContent = `${latestStr} BPM`;
+
+      const rank = computeRank(displayAcc, total, false);
+      const badge = document.getElementById('hudRankBadge');
+      badge.textContent = rank;
+      badge.className = 'rank-badge ' + (rank === '-' ? 'rank-none' : 'rank-' + rank.toLowerCase());
+
+      const isFever = state.running && state.stats.combo >= 10;
+      document.getElementById('arcadeStage').classList.toggle('fever-on', isFever);
+      document.getElementById('feverBadge').classList.toggle('active', isFever);
+
+      // Mode 1 FPGA Engineering HUD
+      document.getElementById('fpgaLiveBpm').textContent = `${latestStr} BPM`;
+      const clampedBpm = Math.min(145, Math.max(75, latestNum));
+      const needlePct = ((clampedBpm - 75) / (145 - 75)) * 100;
+      document.getElementById('fpgaTempoNeedle').style.left = `${needlePct}%`;
+
+      const accBadge = document.getElementById('fpgaAccBadge');
+      accBadge.textContent = `目前準確率 ${acc}% (${acc >= 80 ? '≥80% 達標' : '未達 80% 門檻!'})`;
+      accBadge.style.color = acc >= 80 ? '#34d399' : '#fca5a5';
+      accBadge.style.background = acc >= 80 ? 'rgba(16, 185, 129, 0.14)' : 'rgba(239, 68, 68, 0.22)';
+      accBadge.style.borderColor = acc >= 80 ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.55)';
+      const fScore = document.getElementById('fpgaScoreVal');
+      const fCombo = document.getElementById('fpgaComboVal');
+      if (fScore) fScore.textContent = String(state.score).padStart(6, '0');
+      if (fCombo) fCombo.textContent = state.stats.combo;
+      const fEcgTxt = document.getElementById('fpgaEcgStatusTxt');
+      if (fEcgTxt) {
+        fEcgTxt.textContent = acc >= 80 ? '正常人工循環波形 (有效灌流)' : '灌流不足 (請對準 100~120 BPM)';
+        fEcgTxt.style.color = acc >= 80 ? '#34d399' : '#f87171';
+      }
+      const spo2Rounded = Math.round(state.spo2);
+      document.getElementById('fpgaSpo2Val').textContent = `${spo2Rounded}%`;
+      document.getElementById('fpgaSpo2Bar').style.width = `${spo2Rounded}%`;
+      document.getElementById('fpgaPgRateVal').textContent = `${acc}%`;
+      document.getElementById('fpgaPgRateBar').style.width = `${acc}%`;
+
+      document.getElementById('fpgaCntPerf').textContent = state.stats.perfect;
+      document.getElementById('fpgaCntGood').textContent = state.stats.good;
+      document.getElementById('fpgaCntMiss').textContent = state.stats.miss;
+      document.getElementById('fpgaCntFault').textContent = state.stats.shallow + state.stats.recoil;
+      document.getElementById('fpgaSevenSeg').textContent = String(valid).padStart(4, '0');
+    }
+
+    // ==================== CANVAS RENDERERS (HiDPI) ====================
+    function resizeCanvasHiDPI(canvas) {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return null;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const targetW = Math.round(rect.width * dpr);
+      const targetH = Math.round(rect.height * dpr);
+      if (canvas.width !== targetW || canvas.height !== targetH) {
+        canvas.width = targetW;
+        canvas.height = targetH;
+      }
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return { ctx, w: rect.width, h: rect.height };
+    }
+
+    let ecgSampleAccum = 0;
+    let ecgWavePhase = 0;
+    function advanceEcgBuffer(dt) {
+      ecgSampleAccum += dt;
+      while (ecgSampleAccum >= 0.016) {
+        ecgSampleAccum -= 0.016;
+        let sample = 0;
+        if (state.ecgPulseQueue > 0) {
+          ecgWavePhase += 0.16;
+          const p = ecgWavePhase;
+          if (p < 0.25) sample = Math.sin((p / 0.25) * Math.PI) * 0.16;
+          else if (p < 0.35) sample = -0.22;
+          else if (p < 0.48) sample = 1.0 * Math.sin(((p - 0.35) / 0.13) * Math.PI);
+          else if (p < 0.58) sample = -0.35;
+          else if (p < 0.85) sample = Math.sin(((p - 0.58) / 0.27) * Math.PI) * 0.28;
+          else {
+            state.ecgPulseQueue = 0;
+            ecgWavePhase = 0;
+          }
+        } else {
+          const { acc, total } = computeAccuracyAndTotal();
+          const noiseAmp = (state.running && (total === 0 || acc < 75)) ? 0.16 : 0.03;
+          sample = (Math.random() - 0.5) * noiseAmp;
+        }
+        state.ecgBuffer.push(sample);
+        if (state.ecgBuffer.length > 160) state.ecgBuffer.shift();
+      }
+    }
+
+    function drawEcgToCanvas(canvasId, forceGreen = false) {
+      const canvas = document.getElementById(canvasId);
+      const info = resizeCanvasHiDPI(canvas);
+      if (!info) return;
+      const { ctx, w, h } = info;
+      ctx.clearRect(0, 0, w, h);
+
+      ctx.strokeStyle = 'rgba(52, 211, 153, 0.10)';
+      ctx.lineWidth = 1;
+      const gridStep = 16;
+      for (let x = 0; x < w; x += gridStep) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+      for (let y = 0; y < h; y += gridStep) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+
+      const { acc, total } = computeAccuracyAndTotal();
+      const traceColor = forceGreen ? '#34d399' : ((total === 0 || acc < 60) ? '#f87171' : (acc >= 80 ? '#34d399' : '#facc15'));
+      ctx.save();
+      ctx.strokeStyle = traceColor;
+      ctx.lineWidth = 2.2;
+      ctx.shadowColor = traceColor;
+      ctx.shadowBlur = 9;
+      ctx.beginPath();
+      const midY = h * 0.56;
+      const amp = h * 0.40;
+      const len = state.ecgBuffer.length;
+      for (let i = 0; i < len; i++) {
+        const x = (i / (len - 1)) * w;
+        const y = midY - state.ecgBuffer[i] * amp;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      const lastY = midY - state.ecgBuffer[len - 1] * amp;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(w - 3, lastY, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function renderStageCanvas(canvasId, isNeon, dt) {
+      const canvas = document.getElementById(canvasId);
+      const info = resizeCanvasHiDPI(canvas);
+      if (!info) return;
+      const { ctx, w, h } = info;
+      ctx.clearRect(0, 0, w, h);
+
+      if (state.mode === 'empty') {
+        const minBpm = 70, maxBpm = 150;
+        const y120 = h - ((120 - minBpm) / (maxBpm - minBpm)) * h;
+        const y100 = h - ((100 - minBpm) / (maxBpm - minBpm)) * h;
+
+        ctx.fillStyle = isNeon ? 'rgba(16, 185, 129, 0.22)' : 'rgba(16, 185, 129, 0.16)';
+        ctx.fillRect(0, y120, w, y100 - y120);
+
+        ctx.strokeStyle = 'rgba(16, 185, 129, 0.65)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.moveTo(0, y120); ctx.lineTo(w, y120);
+        ctx.moveTo(0, y100); ctx.lineTo(w, y100);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = '#34d399';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.fillText('120 BPM 上限', 10, y120 - 4);
+        ctx.fillText('100 BPM 下限', 10, y100 + 13);
+
+        if (state.bpmHistory.length > 1) {
+          ctx.save();
+          ctx.strokeStyle = '#38bdf8';
+          ctx.lineWidth = isNeon ? 3 : 2.5;
+          if (isNeon) { ctx.shadowColor = '#38bdf8'; ctx.shadowBlur = 10; }
+          ctx.beginPath();
+          state.bpmHistory.forEach((pt, idx) => {
+            const x = (idx / (state.bpmHistory.length - 1)) * (w - 30) + 15;
+            const clamped = Math.min(maxBpm, Math.max(minBpm, pt.bpm));
+            const y = h - ((clamped - minBpm) / (maxBpm - minBpm)) * h;
+            if (idx === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          });
+          ctx.stroke();
+          ctx.restore();
+        } else {
+          ctx.fillStyle = '#94a3b8';
+          ctx.font = '12px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('請按壓空白鍵或紅色按鈕，即時繪製 BPM 曲線', w / 2, h / 2);
+          ctx.textAlign = 'left';
+        }
+        return;
+      }
+
+      const hitX = isNeon ? Math.max(74, w * 0.16) : 52;
+      const centerY = h / 2;
+      const speed = isNeon ? Math.max(220, w * 0.36) : 210;
+
+      if (isNeon) {
+        const laneH = Math.min(68, h * 0.62);
+        const laneGrad = ctx.createLinearGradient(0, centerY - laneH / 2, 0, centerY + laneH / 2);
+        laneGrad.addColorStop(0, 'rgba(56, 189, 248, 0.02)');
+        laneGrad.addColorStop(0.5, state.stats.combo >= 10 ? 'rgba(168, 85, 247, 0.18)' : 'rgba(56, 189, 248, 0.10)');
+        laneGrad.addColorStop(1, 'rgba(56, 189, 248, 0.02)');
+        ctx.fillStyle = laneGrad;
+        ctx.fillRect(0, centerY - laneH / 2, w, laneH);
+
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.22)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(0, centerY - laneH / 2); ctx.lineTo(w, centerY - laneH / 2);
+        ctx.moveTo(0, centerY + laneH / 2); ctx.lineTo(w, centerY + laneH / 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = state.isPressing ? 'rgba(239, 68, 68, 0.9)' : 'rgba(56, 189, 248, 0.55)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(hitX, 6); ctx.lineTo(hitX, h - 6);
+        ctx.stroke();
+      }
+
+      ctx.strokeStyle = isNeon ? 'rgba(148, 163, 184, 0.35)' : '#1e293b';
+      ctx.lineWidth = isNeon ? 2 : 4;
+      ctx.beginPath();
+      ctx.moveTo(0, centerY); ctx.lineTo(w, centerY);
+      ctx.stroke();
+
+      ctx.save();
+      const ringR = state.isPressing ? (isNeon ? 22 : 18) : (isNeon ? 28 : 22);
+      ctx.strokeStyle = state.isPressing ? '#ef4444' : '#38bdf8';
+      ctx.lineWidth = isNeon ? 3.5 : 3;
+      if (isNeon) { ctx.shadowColor = state.isPressing ? '#ef4444' : '#38bdf8'; ctx.shadowBlur = 16; }
+      ctx.beginPath();
+      ctx.arc(hitX, centerY, ringR, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = state.isPressing ? 'rgba(239, 68, 68, 0.28)' : 'rgba(56, 189, 248, 0.16)';
+      ctx.fill();
+      ctx.restore();
+
+      if (isNeon && canvasId === 'arcadeCanvas') {
+        for (let i = state.ripples.length - 1; i >= 0; i--) {
+          const rp = state.ripples[i];
+          rp.r += dt * 190;
+          rp.alpha -= dt * 2.4;
+          if (rp.alpha <= 0) { state.ripples.splice(i, 1); continue; }
+          ctx.save();
+          ctx.strokeStyle = rp.color;
+          ctx.globalAlpha = Math.max(0, rp.alpha);
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(rp.x, rp.y, rp.r, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+
+      for (const note of state.notes) {
+        if (note.hit) continue;
+        const nDt = note.targetTime - state.elapsed;
+        const x = hitX + nDt * speed;
+        if (x < -36 || x > w + 36) continue;
+
+        ctx.save();
+        if (isNeon) {
+          const nearHit = Math.abs(nDt) < 0.16;
+          const noteColor = note.missed ? '#475569' : (nearHit ? '#34d399' : '#facc15');
+          ctx.shadowColor = noteColor;
+          ctx.shadowBlur = note.missed ? 0 : 15;
+          ctx.fillStyle = noteColor;
+          ctx.beginPath();
+          ctx.arc(x, centerY, nearHit ? 17 : 15, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = note.missed ? '#e2e8f0' : '#06101f';
+          ctx.font = '900 12.5px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('按', x, centerY + 4.5);
+        } else {
+          ctx.fillStyle = note.missed ? '#475569' : '#facc15';
+          ctx.beginPath();
+          ctx.arc(x, centerY, 13, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#0f172a';
+          ctx.font = 'bold 11px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('按', x, centerY + 4);
+        }
+        ctx.restore();
+      }
+
+      if (isNeon && canvasId === 'arcadeCanvas') {
+        for (let i = state.particles.length - 1; i >= 0; i--) {
+          const p = state.particles[i];
+          p.x += p.vx * dt; p.y += p.vy * dt;
+          p.vx *= 0.94; p.vy *= 0.94;
+          p.life -= dt;
+          if (p.life <= 0) { state.particles.splice(i, 1); continue; }
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
+          ctx.fillStyle = p.color;
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = 8;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+
+      ctx.textAlign = 'left';
+    }
+
+    function renderFpgaStageCanvas(dt) {
+      const hud = document.getElementById('fpgaCanvasHud');
+      if (hud) hud.style.display = state.mode === 'game' ? 'flex' : 'none';
+      if (state.mode === 'empty') {
+        renderStageCanvas('fpgaStageCanvas', true, dt);
+        return;
+      }
+      const canvas = document.getElementById('fpgaStageCanvas');
+      const info = resizeCanvasHiDPI(canvas);
+      if (!info) return;
+      const { ctx, w, h } = info;
+      ctx.clearRect(0, 0, w, h);
+
+      const cx = w / 2;
+      const laneW = Math.min(136, Math.max(96, w * 0.34));
+      const hitY = h - 54;
+      const speedY = Math.max(195, h * 0.58);
+
+      // Vertical rhythm lane background & rail borders
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.72)';
+      ctx.fillRect(cx - laneW / 2, 0, laneW, h);
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.22)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(cx - laneW / 2, 0); ctx.lineTo(cx - laneW / 2, h);
+      ctx.moveTo(cx + laneW / 2, 0); ctx.lineTo(cx + laneW / 2, h);
+      ctx.stroke();
+
+      // Subtle center vertical guide
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.12)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 6]);
+      ctx.beginPath();
+      ctx.moveTo(cx, 0); ctx.lineTo(cx, hitY - 30);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Target judgment circle at bottom
+      ctx.save();
+      const ringR = state.isPressing ? 27 : 31;
+      ctx.strokeStyle = state.isPressing ? '#ef4444' : '#38bdf8';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = state.isPressing ? '#ef4444' : '#38bdf8';
+      ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.arc(cx, hitY, ringR, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = state.isPressing ? 'rgba(239, 68, 68, 0.22)' : 'rgba(56, 189, 248, 0.10)';
+      ctx.fill();
+      ctx.restore();
+
+      // Label beneath judgment ring
+      const bpmLabel = state.bpmMode === 'range' ? '100~120 BPM' : `${state.bpmMode} BPM`;
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = 'bold 10.5px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`判定區 [SPACE] (${bpmLabel})`, cx, h - 10);
+
+      // Falling Red '+' Cross Notes (top-to-bottom)
+      for (const note of state.notes) {
+        if (note.hit) continue;
+        const nDt = note.targetTime - state.elapsed;
+        const y = hitY - nDt * speedY;
+        if (y < -36 || y > h + 36) continue;
+
+        ctx.save();
+        const isMissed = note.missed;
+        const noteR = 23;
+        ctx.fillStyle = isMissed ? '#475569' : '#ef4444';
+        ctx.shadowColor = isMissed ? 'transparent' : 'rgba(239, 68, 68, 0.85)';
+        ctx.shadowBlur = isMissed ? 0 : 16;
+        ctx.beginPath();
+        ctx.arc(cx, y, noteR, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = isMissed ? '#94a3b8' : '#fecaca';
+        ctx.stroke();
+
+        // Bold white medical '+' cross inside the note
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(cx - 3.5, y - 10, 7, 20);
+        ctx.fillRect(cx - 10, y - 3.5, 20, 7);
+        ctx.restore();
+      }
+      ctx.textAlign = 'left';
+    }
+
+    // ==================== MAIN GAME LOOP ====================
+    let lastFrameTime = performance.now();
+    function gameLoop(now) {
+      const dt = Math.min(0.05, (now - lastFrameTime) / 1000);
+      lastFrameTime = now;
+
+      if (state.isPressing) {
+        const targetLvl = state.holdType === 'shallow' ? 6 : 12;
+        state.ledLevel = Math.min(targetLvl, state.ledLevel + dt * 95);
+      } else {
+        const minLvl = state.holdType === 'recoil' ? 4 : 0;
+        state.ledLevel = Math.max(minLvl, state.ledLevel - dt * 75);
+      }
+      updateHardwareVisual(state.ledLevel);
+
+      if (state.running && !state.paused) {
+        state.elapsed += dt;
+
+        if (state.duration > 0) {
+          state.timeLeft = Math.max(0, state.duration - state.elapsed);
+          const tText = `剩餘 ${state.timeLeft.toFixed(1)}s`;
+          document.getElementById('timerDisplay').textContent = tText;
+          const mins = String(Math.floor(state.timeLeft / 60)).padStart(2, '0');
+          const secs = (state.timeLeft % 60).toFixed(1).padStart(4, '0');
+          document.getElementById('fpgaTimerDisplay').textContent = `${mins}:${secs}`;
+          const pbar = document.getElementById('fpgaTimeProgressBar');
+          if (pbar) pbar.style.width = `${Math.max(0, (state.timeLeft / state.duration) * 100)}%`;
+          document.getElementById('arcadeTimerDisplay').textContent = `${state.timeLeft.toFixed(1)}s`;
+          if (state.timeLeft <= 0) finishSession();
+        } else {
+          const tText = `已進行 ${state.elapsed.toFixed(1)}s`;
+          document.getElementById('timerDisplay').textContent = tText;
+          const mins = String(Math.floor(state.elapsed / 60)).padStart(2, '0');
+          const secs = (state.elapsed % 60).toFixed(1).padStart(4, '0');
+          document.getElementById('fpgaTimerDisplay').textContent = `${mins}:${secs}`;
+          const pbar = document.getElementById('fpgaTimeProgressBar');
+          if (pbar) pbar.style.width = '100%';
+          document.getElementById('arcadeTimerDisplay').textContent = `${state.elapsed.toFixed(1)}s`;
+        }
+
+        const bpm = getTargetBpm();
+        const beatInterval = 60 / bpm;
+        if (state.elapsed >= state.nextNoteTime) {
+          const curBeat = beatStep % 4;
+          playBeatSound(curBeat === 0);
+          for (let b = 0; b < 4; b++) {
+            const box = document.getElementById('beatBox' + b);
+            if (box) box.classList.toggle('active', b === curBeat);
+          }
+          beatStep++;
+          if (state.mode === 'game') {
+            state.notes.push({ targetTime: state.nextNoteTime + 1.4, hit: false, missed: false });
+          }
+          state.nextNoteTime += beatInterval;
+        }
+
+        if (state.mode === 'game') {
+          for (const note of state.notes) {
+            if (!note.hit && !note.missed && state.elapsed - note.targetTime > 0.22) {
+              note.missed = true;
+              state.stats.miss++;
+              state.recentMisses.push({ time: state.elapsed, prevCombo: state.stats.combo });
+              state.stats.combo = 0;
+              updateStatsUI();
+            }
+          }
+          if (state.notes.length > 60) {
+            state.notes = state.notes.filter(n => state.elapsed - n.targetTime < 1.5);
+          }
+        }
+      }
+
+      advanceEcgBuffer(dt);
+
+      if (state.viewMode === 'arcade') {
+        drawEcgToCanvas('ecgCanvas', false);
+        renderStageCanvas('arcadeCanvas', true, dt);
+      } else if (state.viewMode === 'fpga') {
+        drawEcgToCanvas('fpgaEcgCanvas', false);
+        renderFpgaStageCanvas(dt);
+      } else {
+        renderStageCanvas('stageCanvas', false, dt);
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    // ==================== 3-MODE VIEW SWITCHER & MODE 2 STUDIO ====================
+    function setViewMode(mode) {
+      state.viewMode = mode;
+      document.getElementById('fpgaView').classList.toggle('hidden', mode !== 'fpga');
+      document.getElementById('arcadeView').classList.toggle('hidden', mode !== 'arcade');
+      document.getElementById('classicView').classList.toggle('hidden', mode !== 'classic');
+
+      // Show "換背景/角色" button prominently in Mode 2; hide bottom touch deck in Mode 1 (Mode 1 has built-in panel buttons)
+      document.getElementById('btnOpenStudio').classList.toggle('hidden', mode !== 'arcade');
+      document.getElementById('touchDeck').classList.toggle('hidden', mode === 'fpga');
+
+      document.querySelectorAll('#viewModeGroup .pill-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.view === mode);
+      });
+      document.querySelectorAll('[data-pick-view]').forEach(btn => {
+        btn.classList.toggle('selected', btn.dataset.pickView === mode);
+      });
+    }
+
+    function applyMode2Background(url, label) {
+      document.getElementById('arcadeStage').style.backgroundImage = `url('${url}')`;
+      document.getElementById('studioBgLabel').textContent = `目前：${label}`;
+    }
+
+    function applyMode2Character(url, label) {
+      const img = document.getElementById('arcadeNurseImg');
+      delete img.dataset.fallbackApplied;
+      delete img.dataset.bonusActive;
+      img.src = url;
+      document.getElementById('studioCharLabel').textContent = `目前：${label}`;
+    }
+
+    // Studio Preset Clicks
+    document.querySelectorAll('#bgGridContainer .studio-option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#bgGridContainer .studio-option').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const key = btn.dataset.bgKey;
+        const label = btn.dataset.bgLabel;
+        applyMode2Background(ASSET_PATHS[key], label);
+        showSysToast(`已切換背景：${label}`);
+      });
+    });
+
+    document.querySelectorAll('#charGridContainer .studio-option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#charGridContainer .studio-option').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const key = btn.dataset.charKey;
+        const label = btn.dataset.charLabel;
+        applyMode2Character(ASSET_PATHS[key], label);
+        showSysToast(`已切換陪伴角色：${label}`);
+      });
+    });
+
+    // Local Upload for Custom Background & Character in Mode 2
+    document.getElementById('uploadBgInput').addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        document.querySelectorAll('#bgGridContainer .studio-option').forEach(b => b.classList.remove('active'));
+        applyMode2Background(reader.result, file.name);
+        showSysToast(`已套用自訂背景：${file.name}`);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    document.getElementById('uploadCharInput').addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        document.querySelectorAll('#charGridContainer .studio-option').forEach(b => b.classList.remove('active'));
+        applyMode2Character(reader.result, file.name);
+        showSysToast(`已套用自訂角色：${file.name}`);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    document.getElementById('btnOpenStudio').addEventListener('click', () => {
+      document.getElementById('studioModal').classList.remove('hidden');
+    });
+    document.getElementById('btnCloseStudio').addEventListener('click', () => {
+      document.getElementById('studioModal').classList.add('hidden');
+    });
+    document.getElementById('btnApplyStudio').addEventListener('click', () => {
+      document.getElementById('studioModal').classList.add('hidden');
+    });
+
+    // ==================== SESSION LIFECYCLE ====================
+    function updateHeaderTitles() {
+      const classicTitle = document.getElementById('centerTitle');
+      const arcadeTitle = document.getElementById('arcadeTrackTitle');
+      const fpgaTitle = document.getElementById('fpgaCenterTitle');
+      const fpgaBpmBadge = document.getElementById('fpgaBpmBadge');
+      const fpgaDurBadge = document.getElementById('fpgaDurBadge');
+      if (fpgaBpmBadge) fpgaBpmBadge.textContent = state.bpmMode === 'range' ? '100~120 區間' : `${state.bpmMode} BPM 模式`;
+      if (fpgaDurBadge) fpgaDurBadge.textContent = state.duration > 0 ? `${state.duration}秒 模式` : '∞ 無盡模式';
+      if (state.mode === 'empty') {
+        classicTitle.textContent = '🩺 空壓測驗模式 (純紀錄即時 BPM 與穩定度)';
+        arcadeTitle.textContent = '🩺 空壓測驗';
+        fpgaTitle.textContent = '🩺 空壓測驗模式 (即時追蹤 BPM 曲線)';
+      } else {
+        const bpmLabel = state.bpmMode === 'range' ? '100~120 BPM' : `${state.bpmMode} BPM`;
+        classicTitle.textContent = `🎵 節拍判定軌道 (目標: ${bpmLabel})`;
+        arcadeTitle.textContent = `🎯 ${bpmLabel}`;
+        fpgaTitle.textContent = `${bpmLabel} 黃金急救標準節拍`;
+      }
+    }
+
+    function startSession() {
+      unlockAudio();
+      state.running = true;
+      state.paused = false;
+      state.elapsed = 0;
+      state.timeLeft = state.duration;
+      state.isPressing = false;
+      state.holdType = 'normal';
+      state.ledLevel = 0;
+      state.lastPressTime = 0;
+      state.bpmList = [];
+      state.bpmHistory = [];
+      state.notes = [];
+      state.particles = [];
+      state.ripples = [];
+      state.score = 0;
+      state.spo2 = 88;
+      state.nextNoteTime = 0.2;
+      beatStep = 0;
+      state.recentMisses = [];
+      state.stats = { perfect: 0, good: 0, shallow: 0, recoil: 0, miss: 0, combo: 0, maxCombo: 0 };
+
+      updateStatsUI();
+      updateHeaderTitles();
+      setNurseReaction('💪', '救援開始！跟著節拍穩定按壓 5~6 cm！');
+      appendUartLog('SESSION START -> 等待按壓訊號...', '#38bdf8');
+      document.getElementById('statusTag').textContent = '訓練進行中';
+      document.getElementById('statusTag').style.color = '#10b981';
+      document.getElementById('startModal').classList.add('hidden');
+      document.getElementById('pauseModal').classList.add('hidden');
+      document.getElementById('resultModal').classList.add('hidden');
+      document.getElementById('studioModal').classList.add('hidden');
+    }
+
+    function pauseSession() {
+      if (!state.running || state.paused) return;
+      state.paused = true;
+      state.isPressing = false;
+
+      let forgiven = 0;
+      const cutoff = state.elapsed - 1.25;
+      while (state.recentMisses.length > 0 && state.recentMisses[state.recentMisses.length - 1].time >= cutoff) {
+        const item = state.recentMisses.pop();
+        if (state.stats.miss > 0) {
+          state.stats.miss--;
+          state.stats.combo = item.prevCombo;
+          forgiven++;
+        }
+      }
+      state.notes = state.notes.filter(n => n.hit || n.missed || (n.targetTime - state.elapsed > 0.35));
+      updateStatsUI();
+
+      document.getElementById('pauseGraceNote').textContent = forgiven > 0
+        ? `✨ 已自動扣除暫停前 1.25 秒內產生的 ${forgiven} 次 MISS，並恢復連擊數！`
+        : '訓練已安全暫停，可隨時繼續或直接結算成績。';
+
+      const avg = state.bpmList.length > 0
+        ? Math.round(state.bpmList.reduce((a, b) => a + b, 0) / state.bpmList.length) + ' BPM'
+        : '--';
+      document.getElementById('pauseAvgBpm').textContent = avg;
+      document.getElementById('pauseAcc').textContent = document.getElementById('accVal').textContent;
+      document.getElementById('pauseScore').textContent = state.score;
+      document.getElementById('pauseMaxCombo').textContent = state.stats.maxCombo;
+      document.getElementById('pauseModal').classList.remove('hidden');
+    }
+
+    function resumeSession() {
+      unlockAudio();
+      state.paused = false;
+      document.getElementById('pauseModal').classList.add('hidden');
+    }
+
+    function finishSession() {
+      state.running = false;
+      state.paused = false;
+      state.isPressing = false;
+      document.getElementById('pauseModal').classList.add('hidden');
+
+      const { total, acc } = computeAccuracyAndTotal();
+      const finalAcc = total === 0 ? 0 : acc;
+
+      if (state.score > state.bestScore) {
+        state.bestScore = state.score;
+        saveBestScore(state.bestScore);
+        document.getElementById('hudBestScore').textContent = state.bestScore;
+      }
+
+      let avgBpmText = '--';
+      let zonePct = 0;
+      if (state.bpmList.length > 0) {
+        const avg = Math.round(state.bpmList.reduce((a, b) => a + b, 0) / state.bpmList.length);
+        avgBpmText = `${avg} BPM`;
+        const inZone = state.bpmList.filter(b => b >= 100 && b <= 120).length;
+        zonePct = Math.round((inZone / state.bpmList.length) * 100);
+      }
+
+      const subtext = document.getElementById('resultSubtext');
+      const resultNurseImg = document.getElementById('resultNurseImg');
+      delete resultNurseImg.dataset.bonusActive;
+      const isSuccess = (state.mode === 'game' && finalAcc >= 80 && total >= 5);
+
+      if (state.mode === 'empty') {
+        subtext.textContent = `實測平均節奏為 ${avgBpmText}，${zonePct}% 落在 100~120 BPM 黃金區間。`;
+        resultNurseImg.src = ASSET_PATHS.nurse_start;
+        playResultFanfare(true);
+      } else if (isSuccess) {
+        subtext.textContent = `準確率達 ${finalAcc}%！按壓深度與 100~120 BPM 節奏極為精準，成功挽救患者生命！`;
+        resultNurseImg.src = ASSET_PATHS.nurse_success;
+        playResultFanfare(true);
+      } else {
+        subtext.textContent = `準確率 ${finalAcc}%（低於 80% 門檻）或按壓次數不足，需要重新加強訓練！`;
+        resultNurseImg.src = ASSET_PATHS.nurse_fail;
+        playResultFanfare(false);
+      }
+
+      resultNurseImg.classList.remove('nurse-pop');
+      void resultNurseImg.offsetWidth;
+      resultNurseImg.classList.add('nurse-pop');
+
+      const rank = computeRank(finalAcc, total, true);
+      const resBadge = document.getElementById('resRankBadge');
+      resBadge.textContent = rank;
+      resBadge.className = 'rank-badge rank-' + rank.toLowerCase();
+      document.getElementById('resScoreVal').textContent = state.score;
+      document.getElementById('resBestVal').textContent = state.bestScore;
+
+      document.getElementById('resAvgBpm').textContent = avgBpmText;
+      document.getElementById('resZonePct').textContent = `${zonePct}%`;
+      document.getElementById('resAcc').textContent = `${finalAcc}%`;
+      document.getElementById('resComboTotal').textContent = `${state.stats.maxCombo} / ${total} 下`;
+      document.getElementById('resPG').textContent = `${state.stats.perfect} / ${state.stats.good}`;
+      document.getElementById('resErrors').textContent = `${state.stats.shallow} / ${state.stats.recoil} / ${state.stats.miss}`;
+      document.getElementById('resultModal').classList.remove('hidden');
+    }
+
+    // ==================== OPTIONAL WEB SERIAL (EGO1 FPGA 115200 BAUD) ====================
+    let serialPort = null;
+    let serialReader = null;
+    let serialConnected = false;
+
+    async function toggleSerialConnection() {
+      const btn = document.getElementById('btnSerial');
+      if (!('serial' in navigator)) {
+        showSysToast('此瀏覽器不支援 Web Serial，請改用 Chrome / Edge 桌面版，或直接使用鍵盤/觸控模擬。');
+        return;
+      }
+      if (serialConnected) {
+        try {
+          if (serialReader) await serialReader.cancel();
+          if (serialPort) await serialPort.close();
+        } catch (e) {}
+        serialConnected = false;
+        btn.classList.remove('serial-connected');
+        btn.textContent = '🔌 FPGA';
+        showSysToast('已中斷 FPGA 串列埠連線。');
+        return;
+      }
+
+      try {
+        serialPort = await navigator.serial.requestPort();
+        await serialPort.open({ baudRate: 115200 });
+        serialConnected = true;
+        btn.classList.add('serial-connected');
+        btn.textContent = '🟢 FPGA';
+        showSysToast('已成功連接 EGO1 FPGA (115200 baud)，等待 P / S / E 訊號！');
+        appendUartLog('Web Serial CONNECTED (115200 baud)', '#38bdf8');
+
+        const decoder = new TextDecoderStream();
+        serialPort.readable.pipeTo(decoder.writable).catch(() => {});
+        serialReader = decoder.readable.getReader();
+
+        while (serialConnected) {
+          const { value, done } = await serialReader.read();
+          if (done) break;
+          if (!value) continue;
+          for (const ch of value) {
+            if (ch === 'P' || ch === 'p') {
+              triggerPressDown('normal'); setTimeout(triggerPressRelease, 130);
+            } else if (ch === 'S' || ch === 's') {
+              triggerPressDown('shallow'); setTimeout(triggerPressRelease, 130);
+            } else if (ch === 'E' || ch === 'e') {
+              triggerPressDown('recoil'); setTimeout(triggerPressRelease, 130);
+            }
+          }
+        }
+      } catch (err) {
+        serialConnected = false;
+        btn.classList.remove('serial-connected');
+        btn.textContent = '🔌 FPGA';
+        if (err && err.name !== 'NotFoundError') {
+          showSysToast('無法開啟串列埠，請確認開發板已連接且未被 PySerial 佔用。');
+        }
+      }
+    }
+
+    // ==================== UI EVENT BINDINGS ====================
+    const VIEW_NAMES = { fpga: '⚙️ 模式一：FPGA 工程展示', arcade: '🏥 模式二：醫院遊戲畫面（可改背景/角色）', classic: '📱 模式三：經典 v2 儀表' };
+    document.querySelectorAll('#viewModeGroup .pill-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        setViewMode(btn.dataset.view);
+        showSysToast(`已切換至「${VIEW_NAMES[btn.dataset.view]}」`);
+      });
+    });
+
+    document.querySelectorAll('[data-pick-view]').forEach(btn => {
+      btn.addEventListener('click', () => setViewMode(btn.dataset.pickView));
+    });
+
+    document.querySelectorAll('#modeGroup .pill-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#modeGroup .pill-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.mode = btn.dataset.mode;
+        updateHeaderTitles();
+        if (state.running) startSession();
+      });
+    });
+
+    document.querySelectorAll('#timeGroup .pill-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#timeGroup .pill-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.duration = parseInt(btn.dataset.sec, 10);
+        if (state.running) startSession();
+      });
+    });
+
+    document.querySelectorAll('#bpmGroup .pill-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#bpmGroup .pill-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.bpmMode = btn.dataset.bpm;
+        updateHeaderTitles();
+      });
+    });
+
+    document.getElementById('btnMute').addEventListener('click', () => {
+      state.muted = !state.muted;
+      const btn = document.getElementById('btnMute');
+      btn.textContent = state.muted ? '🔇' : '🔊';
+      btn.classList.toggle('muted', state.muted);
+    });
+
+    document.getElementById('btnSerial').addEventListener('click', toggleSerialConnection);
+
+    document.getElementById('btnFullscreen').addEventListener('click', () => {
+      const docEl = document.documentElement;
+      if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+        if (docEl.requestFullscreen) docEl.requestFullscreen().catch(() => {});
+        else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      }
+    });
+
+    document.getElementById('btnStartGame').addEventListener('click', startSession);
+    document.getElementById('btnPause').addEventListener('click', pauseSession);
+    document.getElementById('btnResume').addEventListener('click', resumeSession);
+    document.getElementById('btnFinishNow').addEventListener('click', finishSession);
+    document.getElementById('btnRestartFromPause').addEventListener('click', startSession);
+    document.getElementById('btnPlayAgain').addEventListener('click', startSession);
+    document.getElementById('btnSwitchAndPlay').addEventListener('click', () => {
+      const nextIdx = (VIEW_ORDER.indexOf(state.viewMode) + 1) % VIEW_ORDER.length;
+      setViewMode(VIEW_ORDER[nextIdx]);
+      startSession();
+    });
+
+    function bindActionButton(id, type) {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      btn.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        btn.classList.add('pressed');
+        triggerPressDown(type);
+      });
+      const endHandler = (e) => {
+        e.preventDefault();
+        btn.classList.remove('pressed');
+        triggerPressRelease();
+      };
+      btn.addEventListener('pointerup', endHandler);
+      btn.addEventListener('pointercancel', endHandler);
+      btn.addEventListener('pointerleave', endHandler);
+    }
+
+    bindActionButton('touchPress', 'normal');
+    bindActionButton('touchShallow', 'shallow');
+    bindActionButton('touchRecoil', 'recoil');
+    bindActionButton('fpgaMainPressBtn', 'normal');
+    bindActionButton('fpgaShallowBtn', 'shallow');
+    bindActionButton('fpgaRecoilBtn', 'recoil');
+
+    window.addEventListener('keydown', (e) => {
+      if (e.repeat) return;
+      if (e.code === 'Space') { e.preventDefault(); triggerPressDown('normal'); }
+      else if (e.key === 's' || e.key === 'S') triggerPressDown('shallow');
+      else if (e.key === 'e' || e.key === 'E') triggerPressDown('recoil');
+      else if (e.key === 'v' || e.key === 'V') {
+        const nextIdx = (VIEW_ORDER.indexOf(state.viewMode) + 1) % VIEW_ORDER.length;
+        setViewMode(VIEW_ORDER[nextIdx]);
+        showSysToast(`已切換至「${VIEW_NAMES[VIEW_ORDER[nextIdx]]}」`);
+      } else if (e.key === 'm' || e.key === 'M') {
+        document.getElementById('btnMute').click();
+      } else if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
+        if (!document.getElementById('studioModal').classList.contains('hidden')) {
+          document.getElementById('studioModal').classList.add('hidden');
+        } else if (state.paused) {
+          resumeSession();
+        } else {
+          pauseSession();
+        }
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'Space' || e.key === 's' || e.key === 'S' || e.key === 'e' || e.key === 'E') {
+        triggerPressRelease();
+      }
+    });
+
+    window.addEventListener('load', () => {
+      setViewMode('arcade');
+      updateHeaderTitles();
+      requestAnimationFrame(gameLoop);
+    });
+  </script>
+</body>
+</html>
