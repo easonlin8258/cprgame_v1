@@ -614,7 +614,7 @@
           </div>
 
           <div class="p-3.5 rounded-2xl bg-sky-950/40 border border-sky-400/25 text-xs sm:text-sm text-sky-100/90 leading-relaxed">
-            <strong>多人聯機說明：</strong>同瀏覽器開 2～6 個分頁輸入同一個房號即可<strong>即時同步出牌、手牌隱藏與聊天</strong>；若與不同裝置的朋友同樂，開局後可點擊上方「🌐 聯機」使用<strong>局面同步碼</strong>互傳接力，或直接補滿 AI 湊齊六人開玩！
+            <strong>跨裝置多人聯機說明：</strong>建立房間後，將 6 碼房號傳給任何手機或電腦上的朋友，對方輸入房號即可<strong>跨裝置即時加入房間、同步出牌與聊天</strong>！空位可一鍵補滿 AI 立即開玩。
           </div>
         </div>
 
@@ -911,7 +911,13 @@
         isHost: false,
         localSeatIndex: 0,
         channel: null,
-        seats: [], // 6 seats: { occupied, isAI, clientId, name, avatar, joinedAt }
+        cloudTopic: '',
+        cloudPollHandle: null,
+        cloudPolling: false,
+        cloudSince: '30m',
+        cloudErrorShown: false,
+        seenMsgIds: new Set(),
+        seats: [], // 6 seats: { occupied, isAI, clientId, name, avatar }
         roomEvents: [], // { time, text, kind }
         lastJoinedSeat: -1,
         joinStatus: 'idle', // 'idle' | 'connecting' | 'connected' | 'timeout'
@@ -949,29 +955,111 @@
         return `RM-${digits}`;
       }
 
+      function makeCloudTopic(roomCode) {
+        return 'rummikub6p_v2_' + String(roomCode).replace(/[^A-Z0-9]/gi, '').toLowerCase();
+      }
+
       function closeRoomChannel() {
         if (net.channel) {
           try { net.channel.close(); } catch (_) {}
           net.channel = null;
         }
+        if (net.cloudPollHandle) {
+          clearInterval(net.cloudPollHandle);
+          net.cloudPollHandle = null;
+        }
+        net.cloudPolling = false;
+        net.cloudTopic = '';
       }
 
-      function openRoomChannel(roomCode) {
+      function dispatchIncomingMessage(msg) {
+        if (!msg || msg.senderId === CLIENT_ID) return;
+        if (msg.msgId) {
+          if (net.seenMsgIds.has(msg.msgId)) return;
+          net.seenMsgIds.add(msg.msgId);
+          if (net.seenMsgIds.size > 400) {
+            const first = net.seenMsgIds.values().next().value;
+            net.seenMsgIds.delete(first);
+          }
+        }
+        handleNetMessage(msg);
+      }
+
+      async function pollCloudRoom() {
+        if (!net.cloudTopic || net.cloudPolling) return;
+        net.cloudPolling = true;
+        try {
+          const url = `https://ntfy.sh/${encodeURIComponent(net.cloudTopic)}/json?poll=1&since=${encodeURIComponent(net.cloudSince)}`;
+          const res = await fetch(url, { method: 'GET', cache: 'no-store' });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const text = await res.text();
+          if (text.trim()) {
+            const lines = text.trim().split('\n');
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              try {
+                const env = JSON.parse(line);
+                if (env.id) net.cloudSince = env.id;
+                if (env.event === 'message' && env.message) {
+                  const inner = JSON.parse(env.message);
+                  dispatchIncomingMessage(inner);
+                }
+              } catch (_) {}
+            }
+          }
+          net.cloudErrorShown = false;
+        } catch (_) {
+          if (!net.cloudErrorShown) {
+            net.cloudErrorShown = true;
+            addRoomEvent('⚠️ 雲端同步暫時無法連線，仍可使用同瀏覽器分頁或同步碼遊玩', 'warn');
+            renderOnlineLobby();
+          }
+        } finally {
+          net.cloudPolling = false;
+        }
+      }
+
+      function openRoomChannel(roomCode, isHostCreating = false) {
         closeRoomChannel();
-        if (typeof BroadcastChannel === 'undefined') return;
-        net.channel = new BroadcastChannel(`rummikub_6p_room_${roomCode}`);
-        net.channel.onmessage = (ev) => {
-          const msg = ev.data;
-          if (!msg || msg.senderId === CLIENT_ID) return;
-          handleNetMessage(msg);
-        };
+        net.seenMsgIds = new Set();
+        net.cloudTopic = makeCloudTopic(roomCode);
+        net.cloudSince = isHostCreating ? String(Math.floor(Date.now() / 1000) - 2) : '10m';
+        net.cloudErrorShown = false;
+
+        if (typeof BroadcastChannel !== 'undefined') {
+          net.channel = new BroadcastChannel(`rummikub_6p_room_${roomCode}`);
+          net.channel.onmessage = (ev) => dispatchIncomingMessage(ev.data);
+        }
+
+        // Start cross-device HTTPS polling via ntfy.sh
+        pollCloudRoom();
+        net.cloudPollHandle = setInterval(pollCloudRoom, 1600);
       }
 
       function sendNetMessage(payload) {
-        if (!net.channel) return;
-        try {
-          net.channel.postMessage({ ...payload, senderId: CLIENT_ID, roomCode: net.roomCode });
-        } catch (_) {}
+        const packet = {
+          ...payload,
+          msgId: CLIENT_ID + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+          senderId: CLIENT_ID,
+          roomCode: net.roomCode
+        };
+        net.seenMsgIds.add(packet.msgId);
+
+        // 1. Instant local BroadcastChannel
+        if (net.channel) {
+          try { net.channel.postMessage(packet); } catch (_) {}
+        }
+
+        // 2. Cross-device HTTPS relay via ntfy.sh
+        if (net.cloudTopic) {
+          try {
+            fetch(`https://ntfy.sh/${encodeURIComponent(net.cloudTopic)}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+              body: JSON.stringify(packet)
+            }).catch(() => {});
+          } catch (_) {}
+        }
       }
 
       function addRoomEvent(text, kind = 'info') {
@@ -1005,25 +1093,32 @@
           avatar
         }));
 
-        addRoomEvent(`👑 房主「${nick}」建立了房間 ${net.roomCode}（座位 #1）`, 'join');
-        openRoomChannel(net.roomCode);
+        addRoomEvent(`👑 房主「${nick}」建立了雲端房間 ${net.roomCode}（座位 #1）`, 'join');
+        openRoomChannel(net.roomCode, true);
+        sendNetMessage({ type: 'LOBBY_SYNC', seats: net.seats, roomEvents: net.roomEvents });
         renderOnlineLobby();
         updateHeaderRoomBadge();
         playSound('select');
-        showToast(`🌐 已建立房間 ${net.roomCode}！其他分頁輸入房號即可加入`, 'success');
+        showToast(`🌐 已建立跨裝置房間 ${net.roomCode}！將房號傳給朋友即可加入`, 'success');
       }
 
       function sendJoinRequest(code, nick) {
         clearJoinTimeout();
         net.joinStatus = 'connecting';
         sendNetMessage({ type: 'JOIN_REQ', name: nick });
+        // Send a second gentle ping after 2.2s in case the first poll overlapped
+        setTimeout(() => {
+          if (net.mode === 'online' && !net.isHost && net.localSeatIndex < 0 && net.roomCode === code) {
+            sendNetMessage({ type: 'JOIN_REQ', name: nick });
+          }
+        }, 2200);
         net.joinTimeoutHandle = setTimeout(() => {
           if (net.mode === 'online' && !net.isHost && net.localSeatIndex < 0) {
             net.joinStatus = 'timeout';
-            addRoomEvent(`⚠️ 尚未收到房間 ${code} 房主回應，請確認房主分頁已開啟且房號正確`, 'warn');
+            addRoomEvent(`⚠️ 尚未收到房間 ${code} 房主回應，請確認房號正確且房主正在房間內`, 'warn');
             renderOnlineLobby();
           }
-        }, 1500);
+        }, 6500);
       }
 
       function joinOnlineRoom() {
@@ -1050,12 +1145,12 @@
           avatar
         }));
 
-        addRoomEvent(`🚪 你（${nick}）正在連線加入房間 ${code}...`, 'info');
-        openRoomChannel(code);
+        addRoomEvent(`🚪 你（${nick}）正在透過雲端連線加入房間 ${code}...`, 'info');
+        openRoomChannel(code, false);
         sendJoinRequest(code, nick);
         renderOnlineLobby();
         updateHeaderRoomBadge();
-        showToast(`正在連線至房間 ${code}...`, 'info');
+        showToast(`☁️ 正在連線至房間 ${code}...`, 'info');
       }
 
       function leaveOnlineRoom() {
@@ -1189,21 +1284,39 @@
         }
       }
 
+      const C_SHORT = { red: 'r', blue: 'b', orange: 'o', black: 'k' };
+      const C_LONG = { r: 'red', b: 'blue', o: 'orange', k: 'black' };
+
+      function packTile(t) {
+        return `${t.id.replace(/^[tj]_/, '')}${t.isJoker ? 'j' : ''}${C_SHORT[t.color]}${t.num}`;
+      }
+
+      function unpackTile(str) {
+        const m = /^(\d+)(j?)([rbok])(\d+)$/.exec(str);
+        if (!m) return { id: 't_0', color: 'red', num: 1, isJoker: false };
+        const isJoker = m[2] === 'j';
+        return { id: (isJoker ? 'j_' : 't_') + m[1], color: C_LONG[m[3]], num: Number(m[4]), isJoker };
+      }
+
       function serializeGameState() {
         return {
-          setupConfig,
-          started: state.started,
-          gameOver: state.gameOver,
-          pool: state.pool,
-          players: state.players,
-          tableSets: state.tableSets,
-          currentPlayerIndex: state.currentPlayerIndex,
-          turnNumber: state.turnNumber,
-          consecutivePasses: state.consecutivePasses,
-          justPlayedIds: Array.from(state.justPlayedIds),
-          justDrawnId: state.justDrawnId,
-          logs: state.logs.slice(0, 40),
-          nextSetUid: state.nextSetUid
+          v: 2,
+          cfg: [setupConfig.icebreakMin, setupConfig.turnSeconds, setupConfig.aiDelayMs],
+          st: state.started ? 1 : 0,
+          go: state.gameOver ? 1 : 0,
+          pl: state.pool.map(packTile),
+          ps: state.players.map(p => ({
+            i: p.id, n: p.name, a: p.isAI ? 1 : 0, v: p.avatar,
+            b: p.hasIcebroken ? 1 : 0, m: p.sortMode, h: p.hand.map(packTile)
+          })),
+          ts: state.tableSets.map(s => [s.id, s.tiles.map(packTile)]),
+          cp: state.currentPlayerIndex,
+          tn: state.turnNumber,
+          cpas: state.consecutivePasses,
+          jp: Array.from(state.justPlayedIds),
+          jd: state.justDrawnId,
+          lg: state.logs.slice(0, 6),
+          nu: state.nextSetUid
         };
       }
 
@@ -1214,19 +1327,42 @@
 
       function applySyncedGameState(data) {
         clearTimers();
-        if (data.setupConfig) setupConfig = data.setupConfig;
-        state.started = data.started;
-        state.gameOver = data.gameOver;
-        state.pool = data.pool || [];
-        state.players = data.players || [];
-        state.tableSets = data.tableSets || [];
-        state.currentPlayerIndex = data.currentPlayerIndex || 0;
-        state.turnNumber = data.turnNumber || 1;
-        state.consecutivePasses = data.consecutivePasses || 0;
-        state.justPlayedIds = new Set(data.justPlayedIds || []);
-        state.justDrawnId = data.justDrawnId || null;
-        state.logs = data.logs || [];
-        state.nextSetUid = data.nextSetUid || 1;
+        if (data.v === 2) {
+          if (Array.isArray(data.cfg)) {
+            setupConfig.icebreakMin = data.cfg[0];
+            setupConfig.turnSeconds = data.cfg[1];
+            setupConfig.aiDelayMs = data.cfg[2];
+          }
+          state.started = !!data.st;
+          state.gameOver = !!data.go;
+          state.pool = (data.pl || []).map(unpackTile);
+          state.players = (data.ps || []).map(p => ({
+            id: p.i, name: p.n, isAI: !!p.a, avatar: p.v,
+            hasIcebroken: !!p.b, sortMode: p.m || 'smart', hand: (p.h || []).map(unpackTile)
+          }));
+          state.tableSets = (data.ts || []).map(s => ({ id: s[0], tiles: (s[1] || []).map(unpackTile) }));
+          state.currentPlayerIndex = data.cp || 0;
+          state.turnNumber = data.tn || 1;
+          state.consecutivePasses = data.cpas || 0;
+          state.justPlayedIds = new Set(data.jp || []);
+          state.justDrawnId = data.jd || null;
+          state.logs = data.lg || [];
+          state.nextSetUid = data.nu || 1;
+        } else {
+          if (data.setupConfig) setupConfig = data.setupConfig;
+          state.started = data.started;
+          state.gameOver = data.gameOver;
+          state.pool = data.pool || [];
+          state.players = data.players || [];
+          state.tableSets = data.tableSets || [];
+          state.currentPlayerIndex = data.currentPlayerIndex || 0;
+          state.turnNumber = data.turnNumber || 1;
+          state.consecutivePasses = data.consecutivePasses || 0;
+          state.justPlayedIds = new Set(data.justPlayedIds || []);
+          state.justDrawnId = data.justDrawnId || null;
+          state.logs = data.logs || [];
+          state.nextSetUid = data.nextSetUid || 1;
+        }
         state.selected = [];
         state.hintTileIds.clear();
         state.waitingPass = false;
@@ -1347,7 +1483,7 @@
         document.getElementById('btn-fill-bots').classList.toggle('hidden', !net.isHost);
         document.getElementById('btn-online-start').classList.toggle('hidden', !net.isHost);
         document.getElementById('online-lobby-hint').textContent = net.isHost
-          ? '💡 在同瀏覽器開新分頁輸入上方房號即可即時加入，或按「空位補滿 AI」立即開局！'
+          ? '☁️ 雲端跨裝置房間已開啟！將上方 6 碼房號傳給朋友即可即時加入，或按「空位補滿 AI」立即開局！'
           : (net.localSeatIndex >= 0
               ? `✅ 你在座位 #${net.localSeatIndex + 1}，已看到所有房間成員，等待房主按下開始對局...`
               : '⏳ 正在連線中...');
@@ -3039,7 +3175,7 @@
           }
           try {
             const decoded = JSON.parse(decodeURIComponent(escape(atob(raw))));
-            if (!decoded || !Array.isArray(decoded.players)) throw new Error('invalid');
+            if (!decoded || (!Array.isArray(decoded.players) && !Array.isArray(decoded.ps))) throw new Error('invalid');
             applySyncedGameState(decoded);
             document.getElementById('modal-sync').classList.add('hidden');
             showToast('📥 已成功載入局面同步碼！', 'success');
