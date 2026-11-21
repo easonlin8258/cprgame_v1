@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>六人拉米 Rummikub — 多人聯機大介面版</title>
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet" />
@@ -565,8 +566,9 @@
             <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-white/10">
               <div>
                 <div class="flex items-center gap-2">
-                  <span class="text-xs font-bold text-emerald-300 uppercase tracking-wider">目前聯機房間</span>
+                  <span class="text-xs font-bold text-emerald-300 uppercase tracking-wider">跨網聯機房間</span>
                   <span id="lobby-member-count" class="px-2.5 py-0.5 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-200 text-xs font-extrabold">1 / 6 人</span>
+                  <span id="lobby-net-status" class="px-2.5 py-0.5 rounded-full bg-sky-500/20 border border-sky-400/40 text-sky-200 text-xs font-bold">☁️ 雲端連線中...</span>
                 </div>
                 <div class="flex items-center gap-2.5 mt-1">
                   <span id="lobby-room-code" class="text-2xl sm:text-3xl font-black tracking-widest text-amber-300">RM-0000</span>
@@ -911,17 +913,22 @@
         isHost: false,
         localSeatIndex: 0,
         channel: null,
+        peer: null,
+        peerConns: [],
+        peerReady: false,
         cloudTopic: '',
         cloudPollHandle: null,
         cloudPolling: false,
-        cloudSince: '30m',
-        cloudErrorShown: false,
+        cloudSince: '5m',
+        cloudOk: false,
+        cloudErrorMsg: '',
         seenMsgIds: new Set(),
         seats: [], // 6 seats: { occupied, isAI, clientId, name, avatar }
         roomEvents: [], // { time, text, kind }
         lastJoinedSeat: -1,
         joinStatus: 'idle', // 'idle' | 'connecting' | 'connected' | 'timeout'
         joinTimeoutHandle: null,
+        joinRetryHandle: null,
         chatMessages: []
       };
 
@@ -956,7 +963,32 @@
       }
 
       function makeCloudTopic(roomCode) {
-        return 'rummikub6p_v2_' + String(roomCode).replace(/[^A-Z0-9]/gi, '').toLowerCase();
+        return 'rummikub6p_v3_' + String(roomCode).replace(/[^A-Z0-9]/gi, '').toLowerCase();
+      }
+
+      function makeHostPeerId(roomCode) {
+        return 'rummikub6p-host-' + String(roomCode).replace(/[^A-Z0-9]/gi, '').toLowerCase();
+      }
+
+      function updateNetStatusPill() {
+        const el = document.getElementById('lobby-net-status');
+        if (!el) return;
+        if (net.peerReady && net.cloudOk) {
+          el.textContent = '⚡ 跨網 P2P + 雲端已連線';
+          el.className = 'px-2.5 py-0.5 rounded-full bg-emerald-500/25 border border-emerald-400/50 text-emerald-200 text-xs font-extrabold';
+        } else if (net.peerReady) {
+          el.textContent = '⚡ 跨網 P2P 已連線';
+          el.className = 'px-2.5 py-0.5 rounded-full bg-emerald-500/25 border border-emerald-400/50 text-emerald-200 text-xs font-extrabold';
+        } else if (net.cloudOk) {
+          el.textContent = '☁️ 跨網雲端已連線';
+          el.className = 'px-2.5 py-0.5 rounded-full bg-emerald-500/25 border border-emerald-400/50 text-emerald-200 text-xs font-extrabold';
+        } else if (net.cloudErrorMsg) {
+          el.textContent = '⚠️ 網路受限（僅本機/同步碼）';
+          el.className = 'px-2.5 py-0.5 rounded-full bg-rose-500/25 border border-rose-400/50 text-rose-200 text-xs font-bold';
+        } else {
+          el.textContent = '☁️ 跨網連線中...';
+          el.className = 'px-2.5 py-0.5 rounded-full bg-sky-500/20 border border-sky-400/40 text-sky-200 text-xs font-bold';
+        }
       }
 
       function closeRoomChannel() {
@@ -968,8 +1000,19 @@
           clearInterval(net.cloudPollHandle);
           net.cloudPollHandle = null;
         }
+        if (net.peerConns && net.peerConns.length) {
+          net.peerConns.forEach(c => { try { c.close(); } catch (_) {} });
+          net.peerConns = [];
+        }
+        if (net.peer) {
+          try { net.peer.destroy(); } catch (_) {}
+          net.peer = null;
+        }
+        net.peerReady = false;
         net.cloudPolling = false;
         net.cloudTopic = '';
+        net.cloudOk = false;
+        net.cloudErrorMsg = '';
       }
 
       function dispatchIncomingMessage(msg) {
@@ -982,7 +1025,67 @@
             net.seenMsgIds.delete(first);
           }
         }
+        // If Host receives a P2P message from one guest, relay to other connected P2P guests too
+        if (net.isHost && net.peerConns.length > 0 && msg.type !== 'JOIN_REQ') {
+          net.peerConns.forEach(c => {
+            if (c.open) { try { c.send(msg); } catch (_) {} }
+          });
+        }
         handleNetMessage(msg);
+      }
+
+      function initPeerP2P(roomCode, isHost) {
+        if (typeof window.Peer !== 'function') return;
+        try {
+          const peerOpts = {
+            debug: 0,
+            config: {
+              iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+              ]
+            }
+          };
+          const peer = isHost ? new window.Peer(makeHostPeerId(roomCode), peerOpts) : new window.Peer(undefined, peerOpts);
+          net.peer = peer;
+
+          peer.on('open', () => {
+            net.peerReady = true;
+            updateNetStatusPill();
+            if (!isHost) {
+              try {
+                const conn = peer.connect(makeHostPeerId(roomCode), { reliable: true });
+                conn.on('open', () => {
+                  net.peerConns.push(conn);
+                  const nick = document.getElementById('online-nickname').value.trim() || '玩家';
+                  if (net.localSeatIndex < 0) {
+                    sendNetMessage({ type: 'JOIN_REQ', name: nick });
+                  }
+                });
+                conn.on('data', (data) => dispatchIncomingMessage(data));
+                conn.on('close', () => {
+                  net.peerConns = net.peerConns.filter(c => c !== conn);
+                });
+              } catch (_) {}
+            }
+          });
+
+          if (isHost) {
+            peer.on('connection', (conn) => {
+              conn.on('open', () => {
+                net.peerConns.push(conn);
+              });
+              conn.on('data', (data) => dispatchIncomingMessage(data));
+              conn.on('close', () => {
+                net.peerConns = net.peerConns.filter(c => c !== conn);
+              });
+            });
+          }
+
+          peer.on('error', () => {
+            // Silently fall back to HTTPS cloud relay if WebRTC/WebSocket is unavailable
+          });
+        } catch (_) {}
       }
 
       async function pollCloudRoom() {
@@ -993,6 +1096,11 @@
           const res = await fetch(url, { method: 'GET', cache: 'no-store' });
           if (!res.ok) throw new Error('HTTP ' + res.status);
           const text = await res.text();
+          if (!net.cloudOk) {
+            net.cloudOk = true;
+            net.cloudErrorMsg = '';
+            updateNetStatusPill();
+          }
           if (text.trim()) {
             const lines = text.trim().split('\n');
             for (const line of lines) {
@@ -1007,12 +1115,10 @@
               } catch (_) {}
             }
           }
-          net.cloudErrorShown = false;
-        } catch (_) {
-          if (!net.cloudErrorShown) {
-            net.cloudErrorShown = true;
-            addRoomEvent('⚠️ 雲端同步暫時無法連線，仍可使用同瀏覽器分頁或同步碼遊玩', 'warn');
-            renderOnlineLobby();
+        } catch (err) {
+          if (!net.cloudErrorMsg) {
+            net.cloudErrorMsg = String(err && err.message || 'network');
+            updateNetStatusPill();
           }
         } finally {
           net.cloudPolling = false;
@@ -1023,17 +1129,24 @@
         closeRoomChannel();
         net.seenMsgIds = new Set();
         net.cloudTopic = makeCloudTopic(roomCode);
-        net.cloudSince = isHostCreating ? String(Math.floor(Date.now() / 1000) - 2) : '10m';
-        net.cloudErrorShown = false;
+        // Use server-relative duration (zero client clock skew!)
+        net.cloudSince = isHostCreating ? '15s' : '15m';
+        net.cloudOk = false;
+        net.cloudErrorMsg = '';
 
+        // 1. Local same-browser BroadcastChannel
         if (typeof BroadcastChannel !== 'undefined') {
           net.channel = new BroadcastChannel(`rummikub_6p_room_${roomCode}`);
           net.channel.onmessage = (ev) => dispatchIncomingMessage(ev.data);
         }
 
-        // Start cross-device HTTPS polling via ntfy.sh
+        // 2. Cross-network WebRTC P2P (PeerJS)
+        initPeerP2P(roomCode, isHostCreating);
+
+        // 3. Cross-network HTTPS Relay Polling (ntfy.sh)
+        updateNetStatusPill();
         pollCloudRoom();
-        net.cloudPollHandle = setInterval(pollCloudRoom, 1600);
+        net.cloudPollHandle = setInterval(pollCloudRoom, 1300);
       }
 
       function sendNetMessage(payload) {
@@ -1050,13 +1163,25 @@
           try { net.channel.postMessage(packet); } catch (_) {}
         }
 
-        // 2. Cross-device HTTPS relay via ntfy.sh
+        // 2. Direct WebRTC P2P connections
+        if (net.peerConns && net.peerConns.length > 0) {
+          net.peerConns.forEach(c => {
+            if (c.open) { try { c.send(packet); } catch (_) {} }
+          });
+        }
+
+        // 3. Cross-network HTTPS relay via ntfy.sh (simple CORS POST, no preflight)
         if (net.cloudTopic) {
           try {
             fetch(`https://ntfy.sh/${encodeURIComponent(net.cloudTopic)}`, {
               method: 'POST',
-              headers: { 'Content-Type': 'text/plain; charset=utf-8' },
               body: JSON.stringify(packet)
+            }).then(res => {
+              if (res && res.ok && !net.cloudOk) {
+                net.cloudOk = true;
+                net.cloudErrorMsg = '';
+                updateNetStatusPill();
+              }
             }).catch(() => {});
           } catch (_) {}
         }
@@ -1072,6 +1197,10 @@
         if (net.joinTimeoutHandle) {
           clearTimeout(net.joinTimeoutHandle);
           net.joinTimeoutHandle = null;
+        }
+        if (net.joinRetryHandle) {
+          clearInterval(net.joinRetryHandle);
+          net.joinRetryHandle = null;
         }
       }
 
@@ -1106,19 +1235,22 @@
         clearJoinTimeout();
         net.joinStatus = 'connecting';
         sendNetMessage({ type: 'JOIN_REQ', name: nick });
-        // Send a second gentle ping after 2.2s in case the first poll overlapped
-        setTimeout(() => {
+        net.joinRetryHandle = setInterval(() => {
           if (net.mode === 'online' && !net.isHost && net.localSeatIndex < 0 && net.roomCode === code) {
             sendNetMessage({ type: 'JOIN_REQ', name: nick });
+          } else {
+            clearInterval(net.joinRetryHandle);
+            net.joinRetryHandle = null;
           }
         }, 2200);
         net.joinTimeoutHandle = setTimeout(() => {
+          clearJoinTimeout();
           if (net.mode === 'online' && !net.isHost && net.localSeatIndex < 0) {
             net.joinStatus = 'timeout';
-            addRoomEvent(`⚠️ 尚未收到房間 ${code} 房主回應，請確認房號正確且房主正在房間內`, 'warn');
+            addRoomEvent(`⚠️ 尚未收到房間 ${code} 房主回應，請確認房號正確且房主仍在房間內`, 'warn');
             renderOnlineLobby();
           }
-        }, 6500);
+        }, 10000);
       }
 
       function joinOnlineRoom() {
@@ -1480,6 +1612,7 @@
           }).join('');
         }
 
+        updateNetStatusPill();
         document.getElementById('btn-fill-bots').classList.toggle('hidden', !net.isHost);
         document.getElementById('btn-online-start').classList.toggle('hidden', !net.isHost);
         document.getElementById('online-lobby-hint').textContent = net.isHost
@@ -3256,6 +3389,11 @@
         initEvents();
         renderSetupSeats();
         switchLobbyTab('online');
+        try {
+          const params = new URLSearchParams(window.location.search);
+          const r = params.get('room');
+          if (r) document.getElementById('join-room-input').value = r.toUpperCase();
+        } catch (_) {}
       });
     })();
   </script>
