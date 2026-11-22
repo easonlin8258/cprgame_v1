@@ -2391,6 +2391,7 @@
       er: 'er_bg.jpg',
       nurse_start: 'nurse_start.gif',
       bonus1: 'Bonus1.gif',
+      bonus1_sfx: 'Voice1.mp3',
       nurse_success: 'nurse_success.gif',
       nurse_fail: 'nurse_fail.gif',
       paramedic: 'Cheer2.gif',
@@ -2419,6 +2420,17 @@
     // Global Easter Egg: clicking nurse_start.gif on ANY screen plays Bonus1.gif ONCE and switches back automatically
     const BONUS1_FALLBACK_MS = 1200; // 若為本機 file:// 開啟或單影格圖片時的預設播放秒數（毫秒）
     let bonus1DurationMs = BONUS1_FALLBACK_MS;
+    const bonus1Audio = new Audio(ASSET_PATHS.bonus1_sfx);
+    bonus1Audio.preload = 'auto';
+
+    function playBonus1Sfx() {
+      if (typeof state !== 'undefined' && state.muted) return;
+      try {
+        bonus1Audio.currentTime = 0;
+        const p = bonus1Audio.play();
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+      } catch (_) {}
+    }
 
     function clearBonusTimer(img) {
       if (img && img._bonusTimer) {
@@ -2487,6 +2499,7 @@
         img.dataset.bonusActive = '1';
         const sep = ASSET_PATHS.bonus1.includes('?') ? '&' : '?';
         img.src = ASSET_PATHS.bonus1 + sep + 'play=' + Date.now();
+        playBonus1Sfx();
         if (img.id === 'arcadeNurseImg') {
           img.classList.remove('cheer-bounce');
           void img.offsetWidth;
