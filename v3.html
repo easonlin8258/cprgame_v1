@@ -2419,14 +2419,37 @@
 
     // Global Easter Egg: clicking nurse_start.gif on ANY screen plays Bonus1.gif ONCE and switches back automatically
     const BONUS1_FALLBACK_MS = 1200; // 若為本機 file:// 開啟或單影格圖片時的預設播放秒數（毫秒）
+    const VOICE1_FALLBACK_SEC = 1.593; // Voice1.mp3 實際長度（秒），供首次點擊尚未載入 metadata 時計算倍速
     let bonus1DurationMs = BONUS1_FALLBACK_MS;
     const bonus1Audio = new Audio(ASSET_PATHS.bonus1_sfx);
     bonus1Audio.preload = 'auto';
 
+    function syncBonus1AudioRate() {
+      const targetSec = Math.max(0.2, bonus1DurationMs / 1000);
+      const audioDur = (Number.isFinite(bonus1Audio.duration) && bonus1Audio.duration > 0)
+        ? bonus1Audio.duration
+        : VOICE1_FALLBACK_SEC;
+      const rate = Math.min(4.0, Math.max(0.5, audioDur / targetSec));
+      try {
+        bonus1Audio.playbackRate = rate;
+      } catch (_) {}
+    }
+
+    bonus1Audio.addEventListener('loadedmetadata', syncBonus1AudioRate);
+
+    function stopBonus1Sfx() {
+      try {
+        bonus1Audio.pause();
+        bonus1Audio.currentTime = 0;
+      } catch (_) {}
+    }
+
     function playBonus1Sfx() {
       if (typeof state !== 'undefined' && state.muted) return;
       try {
+        bonus1Audio.pause();
         bonus1Audio.currentTime = 0;
+        syncBonus1AudioRate();
         const p = bonus1Audio.play();
         if (p && typeof p.catch === 'function') p.catch(() => {});
       } catch (_) {}
@@ -2438,6 +2461,7 @@
         img._bonusTimer = null;
       }
       if (img) delete img.dataset.bonusActive;
+      stopBonus1Sfx();
     }
 
     // 自動解析 Bonus1.gif 的實際單輪動畫總長度（毫秒）
@@ -2482,6 +2506,7 @@
         }
         if (frames > 1 && totalMs > 0) {
           bonus1DurationMs = totalMs;
+          syncBonus1AudioRate();
         }
       } catch (_) {
         // file:// 環境下會自動沿用 BONUS1_FALLBACK_MS
@@ -3861,8 +3886,9 @@
         serialConnected = true;
         btn.classList.add('serial-connected');
         btn.textContent = '🟢 FPGA';
-        showSysToast('已成功連接 EGO1 FPGA (115200 baud)，等待 P / S / E 訊號！');
-        appendUartLog('Web Serial CONNECTED (115200 baud)', '#38bdf8');
+        btn.blur();
+        showSysToast('已連接 EGO1 FPGA (115200 baud)，支援 S0~S4 與電腦鍵盤同時控制！');
+        appendUartLog('Web Serial CONNECTED (115200 baud | Space/S/E/V/P + Keyboard)', '#38bdf8');
 
         const decoder = new TextDecoderStream();
         serialPort.readable.pipeTo(decoder.writable).catch(() => {});
@@ -3873,12 +3899,29 @@
           if (done) break;
           if (!value) continue;
           for (const ch of value) {
-            if (ch === 'P' || ch === 'p') {
+            if (ch === ' ') {
               triggerPressDown('normal'); setTimeout(triggerPressRelease, 130);
             } else if (ch === 'S' || ch === 's') {
               triggerPressDown('shallow'); setTimeout(triggerPressRelease, 130);
             } else if (ch === 'E' || ch === 'e') {
               triggerPressDown('recoil'); setTimeout(triggerPressRelease, 130);
+            } else if (ch === 'V' || ch === 'v') {
+              const nextIdx = (VIEW_ORDER.indexOf(state.viewMode) + 1) % VIEW_ORDER.length;
+              setViewMode(VIEW_ORDER[nextIdx]);
+              showSysToast(`已切換至「${VIEW_NAMES[VIEW_ORDER[nextIdx]]}」`);
+              appendUartLog("UART RX -> 0x56 ('V') SWITCH_VIEW", '#38bdf8');
+            } else if (ch === 'P' || ch === 'p') {
+              if (!document.getElementById('studioModal').classList.contains('hidden')) {
+                document.getElementById('studioModal').classList.add('hidden');
+              } else if (state.paused) {
+                resumeSession();
+              } else {
+                pauseSession();
+              }
+              appendUartLog("UART RX -> 0x50 ('P') PAUSE_TOGGLE", '#38bdf8');
+            } else if (ch === 'M' || ch === 'm') {
+              document.getElementById('btnMute').click();
+              appendUartLog("UART RX -> 0x4D ('M') MUTE_TOGGLE", '#38bdf8');
             }
           }
         }
@@ -3938,6 +3981,7 @@
       const btn = document.getElementById('btnMute');
       btn.textContent = state.muted ? '🔇' : '🔊';
       btn.classList.toggle('muted', state.muted);
+      if (state.muted) stopBonus1Sfx();
     });
 
     document.getElementById('btnSerial').addEventListener('click', toggleSerialConnection);
