@@ -1656,6 +1656,124 @@
       background: rgba(16, 185, 129, 0.1);
     }
 
+    #studioModal { z-index: 120; }
+
+    .start-modal-card {
+      max-width: 560px;
+      max-height: 92vh;
+      overflow-y: auto;
+      padding: 18px 20px;
+    }
+
+    .start-config-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+      text-align: left;
+    }
+
+    .start-config-box {
+      background: rgba(22, 34, 54, 0.85);
+      border: 1px solid #2b3a55;
+      border-radius: 10px;
+      padding: 8px 10px;
+    }
+
+    .start-config-box.full {
+      grid-column: 1 / -1;
+    }
+
+    .start-config-label {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #94a3b8;
+      margin-bottom: 5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .start-pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    .start-pill-btn {
+      flex: 1;
+      min-width: 48px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: #cbd5e1;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 5px 7px;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+    }
+
+    .start-pill-btn.active {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: #38bdf8;
+      color: #fff;
+      box-shadow: 0 0 8px rgba(56, 189, 248, 0.25);
+    }
+
+    .music-select {
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: #f1f5f9;
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 5px 8px;
+      border-radius: 8px;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .music-select:focus {
+      border-color: #38bdf8;
+    }
+
+    .custom-mp3-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 6px;
+      font-size: 11px;
+      color: #cbd5e1;
+    }
+
+    .custom-mp3-row.hidden { display: none; }
+
+    .mp3-upload-btn {
+      background: rgba(56, 189, 248, 0.18);
+      border: 1px solid #38bdf8;
+      color: #e0f2fe;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 7px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .mp3-upload-btn input { display: none; }
+
+    .start-studio-btn {
+      background: rgba(168, 85, 247, 0.18);
+      border: 1px solid rgba(168, 85, 247, 0.55);
+      color: #e9d5ff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 7px;
+      cursor: pointer;
+    }
+
     .result-score-banner {
       display: flex;
       align-items: center;
@@ -1759,6 +1877,13 @@
           <button class="pill-btn" data-bpm="120">120</button>
           <button class="pill-btn" data-bpm="range">100~120</button>
         </div>
+
+        <select id="headerTrackSelect" class="music-select" title="選擇背景節奏音樂">
+          <option value="stayin">🎵 Stayin' Alive</option>
+          <option value="golden" selected>🎵 黃金急救電音</option>
+          <option value="rush">🎵 急診室合成波</option>
+          <option value="custom">📂 自選 MP3</option>
+        </select>
 
         <button class="action-btn icon-only" id="btnMute" title="開關音效 (熱鍵 M)">🔊</button>
         <button class="action-btn" id="btnSerial" title="連接 EGO1 FPGA USB-UART (115200 baud)">🔌 FPGA</button>
@@ -2337,7 +2462,7 @@
 
   <!-- ==================== START MODAL ==================== -->
   <div class="modal-overlay" id="startModal">
-    <div class="modal-card">
+    <div class="modal-card start-modal-card">
       <div class="start-hero-row">
         <div class="start-avatar-box">
           <img src="nurse_start.gif" alt="護理師" id="startNurseImg" />
@@ -2347,26 +2472,77 @@
         </div>
       </div>
       <div class="modal-title">🫀 CPR 節奏訓練系統 v3 三模式版</div>
-      <p class="modal-desc">
-        可任選三種展示介面（訓練中按 <strong>V</strong> 隨時切換），模式二支援自訂背景與角色！
+      <p class="modal-desc" style="margin-bottom:10px;">
+        開始前可一次選好介面、模式、時長、BPM、背景音樂與是否連接 FPGA 板子！
       </p>
 
-      <div class="mode-select-cards">
-        <button class="mode-choice-btn" data-pick-view="fpga">
+      <div class="mode-select-cards" style="margin-bottom:10px;">
+        <button type="button" class="mode-choice-btn" data-pick-view="fpga">
           <span class="mode-choice-title">⚙️ 模式一 FPGA</span>
-          <span class="mode-choice-sub">七段顯示器、UART 終端機、血氧與完整工程監控</span>
+          <span class="mode-choice-sub">七段顯示器、UART 終端機、血氧與工程監控</span>
         </button>
-        <button class="mode-choice-btn selected" data-pick-view="arcade">
+        <button type="button" class="mode-choice-btn selected" data-pick-view="arcade">
           <span class="mode-choice-title">🏥 模式二 遊戲</span>
-          <span class="mode-choice-sub">明亮醫院遊戲畫面，可自由切換背景與陪伴角色</span>
+          <span class="mode-choice-sub">醫院遊戲畫面，可自由切換背景與陪伴角色</span>
         </button>
-        <button class="mode-choice-btn" data-pick-view="classic">
+        <button type="button" class="mode-choice-btn" data-pick-view="classic">
           <span class="mode-choice-title">📱 模式三 經典</span>
-          <span class="mode-choice-sub">保留原本 v2 三欄式精簡氣囊機構與生理監視器</span>
+          <span class="mode-choice-sub">保留 v2 三欄式精簡氣囊機構與生理監視器</span>
         </button>
       </div>
 
-      <div class="fpga-choice-section">
+      <div class="start-config-grid">
+        <div class="start-config-box">
+          <div class="start-config-label"><span>🎯 訓練模式</span></div>
+          <div class="start-pill-row" id="startModeGroup">
+            <button type="button" class="start-pill-btn active" data-start-mode="game">🎮 節奏遊戲</button>
+            <button type="button" class="start-pill-btn" data-start-mode="empty">🩺 空壓測驗</button>
+          </div>
+        </div>
+
+        <div class="start-config-box">
+          <div class="start-config-label"><span>⏱️ 訓練時長</span></div>
+          <div class="start-pill-row" id="startTimeGroup">
+            <button type="button" class="start-pill-btn" data-start-sec="10">10s</button>
+            <button type="button" class="start-pill-btn active" data-start-sec="30">30s</button>
+            <button type="button" class="start-pill-btn" data-start-sec="60">60s</button>
+            <button type="button" class="start-pill-btn" data-start-sec="0">∞</button>
+          </div>
+        </div>
+
+        <div class="start-config-box full">
+          <div class="start-config-label"><span>💓 目標節拍（BPM）</span></div>
+          <div class="start-pill-row" id="startBpmGroup">
+            <button type="button" class="start-pill-btn" data-start-bpm="100">100 BPM</button>
+            <button type="button" class="start-pill-btn active" data-start-bpm="110">110 BPM</button>
+            <button type="button" class="start-pill-btn" data-start-bpm="120">120 BPM</button>
+            <button type="button" class="start-pill-btn" data-start-bpm="range">100~120 區間</button>
+          </div>
+        </div>
+
+        <div class="start-config-box full">
+          <div class="start-config-label">
+            <span>🎵 選擇背景節奏音樂</span>
+            <button type="button" class="start-studio-btn" id="btnStartOpenStudio">🎨 換背景／角色</button>
+          </div>
+          <select id="startTrackSelect" class="music-select" style="width:100%;">
+            <option value="stayin">🎵 曲風 1：Stayin' Alive 迪斯可律動</option>
+            <option value="golden" selected>🎵 曲風 2：黃金急救標準電音節拍</option>
+            <option value="rush">🎵 曲風 3：急診室合成波衝刺</option>
+            <option value="custom">📂 曲風 4：上傳自選 MP3 音樂檔</option>
+          </select>
+          <div class="custom-mp3-row hidden" id="startCustomMp3Row">
+            <label class="mp3-upload-btn">
+              📂 選擇音檔 (MP3/WAV)
+              <input type="file" id="customAudioFileInput" accept="audio/*" />
+            </label>
+            <span id="customAudioFileName" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">尚未選擇自訂音檔</span>
+          </div>
+          <audio id="customAudioPlayer" loop></audio>
+        </div>
+      </div>
+
+      <div class="fpga-choice-section" style="margin-bottom:10px;">
         <div class="fpga-choice-label">🎛️ 選擇操控方式（開始前可先決定是否連接板子）</div>
         <div class="fpga-choice-cards">
           <button type="button" class="fpga-choice-btn selected" data-pick-fpga="none" id="pickFpgaNone">
@@ -2655,6 +2831,7 @@
       mode: 'game',       // 'game' | 'empty'
       duration: 30,
       bpmMode: '110',
+      track: 'golden',
       muted: false,
       running: false,
       paused: false,
@@ -2725,21 +2902,152 @@
       if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
     }
 
-    function playBeatSound(isAccent) {
-      if (state.muted || !audioCtx || state.mode !== 'game') return;
-      if (audioCtx.state === 'suspended') audioCtx.resume();
+    function playKickDrum(time, startFreq, duration) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.frequency.setValueAtTime(startFreq, time);
+      osc.frequency.exponentialRampToValueAtTime(38, time + duration);
+      gain.gain.setValueAtTime(0.42, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(time);
+      osc.stop(time + duration);
+    }
+
+    function playClapSnare(time) {
+      const bufferSize = Math.floor(audioCtx.sampleRate * 0.12);
+      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = buffer;
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1200, time);
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.22, time);
+      gain.gain.exponentialRampToValueAtTime(0.01, time + 0.12);
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioCtx.destination);
+      noise.start(time);
+    }
+
+    function playHiHat(time) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(6000, time);
+      gain.gain.setValueAtTime(0.05, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(time);
+      osc.stop(time + 0.05);
+    }
+
+    function playSynthBass(time, freq, duration, type = 'sawtooth') {
+      const osc = audioCtx.createOscillator();
+      const filter = audioCtx.createBiquadFilter();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, time);
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(650, time);
+      filter.frequency.exponentialRampToValueAtTime(180, time + duration);
+      gain.gain.setValueAtTime(0.16, time);
+      gain.gain.exponentialRampToValueAtTime(0.005, time + duration);
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(time);
+      osc.stop(time + duration);
+    }
+
+    function playChordStab(time, freqs, duration) {
+      freqs.forEach(f => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(f, time);
+        gain.gain.setValueAtTime(0.055, time);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(time);
+        osc.stop(time + duration);
+      });
+    }
+
+    function playMetronomeTick(isAccent) {
       const now = audioCtx.currentTime;
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
-      osc.type = isAccent ? 'triangle' : 'sine';
-      osc.frequency.setValueAtTime(isAccent ? 620 : 440, now);
-      osc.frequency.exponentialRampToValueAtTime(110, now + 0.09);
-      gain.gain.setValueAtTime(isAccent ? 0.2 : 0.12, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(isAccent ? 1320 : 880, now);
+      gain.gain.setValueAtTime(0.16, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
       osc.connect(gain);
       gain.connect(audioCtx.destination);
       osc.start(now);
-      osc.stop(now + 0.12);
+      osc.stop(now + 0.06);
+    }
+
+    function playBeatSound(isAccent, beatNum = 0, beatInterval = 0.545) {
+      if (state.muted || !audioCtx || state.mode !== 'game') return;
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const now = audioCtx.currentTime;
+      const stepInBar = beatNum % 4;
+
+      if (state.track === 'custom') {
+        playMetronomeTick(isAccent);
+        return;
+      }
+
+      if (state.track === 'stayin') {
+        playKickDrum(now, 130, 0.32);
+        if (stepInBar === 1 || stepInBar === 3) playClapSnare(now);
+        const bassFreqs = [87.31, 87.31, 103.83, 116.54, 130.81, 116.54, 103.83, 98.00];
+        playSynthBass(now, bassFreqs[beatNum % bassFreqs.length], 0.26, 'sawtooth');
+        playChordStab(now + beatInterval * 0.5, [349.23, 415.30, 523.25], 0.12);
+      } else if (state.track === 'rush') {
+        playKickDrum(now, 165, 0.32);
+        if (stepInBar === 1 || stepInBar === 3) playClapSnare(now);
+        const synthBass = [110, 110, 130.81, 146.83][stepInBar];
+        playSynthBass(now, synthBass, 0.2, 'sawtooth');
+        playSynthBass(now + beatInterval * 0.5, synthBass * 1.5, 0.14, 'square');
+      } else {
+        // golden (預設：黃金急救標準電音節拍)
+        playKickDrum(now, 150, 0.28);
+        playMetronomeTick(stepInBar === 0);
+        const arpFreqs = [220, 261.63, 329.63, 293.66];
+        playSynthBass(now, arpFreqs[stepInBar] / 2, 0.2, 'triangle');
+        if (stepInBar % 2 === 1) playHiHat(now);
+      }
+    }
+
+    function syncCustomAudioPlayback(action) {
+      const player = document.getElementById('customAudioPlayer');
+      if (!player) return;
+      player.muted = state.muted;
+      if (action === 'stop') {
+        player.pause();
+        try { player.currentTime = 0; } catch (_) {}
+      } else if (action === 'pause') {
+        player.pause();
+      } else if (action === 'start') {
+        if (state.mode === 'game' && state.track === 'custom' && player.src && !state.muted) {
+          try { player.currentTime = 0; } catch (_) {}
+          player.play().catch(() => {});
+        } else {
+          player.pause();
+        }
+      } else if (action === 'resume') {
+        if (state.mode === 'game' && state.track === 'custom' && player.src && !state.muted) {
+          player.play().catch(() => {});
+        }
+      }
     }
 
     function playHitSound(kind) {
@@ -3635,7 +3943,7 @@
         const beatInterval = 60 / bpm;
         if (state.elapsed >= state.nextNoteTime) {
           const curBeat = beatStep % 4;
-          playBeatSound(curBeat === 0);
+          playBeatSound(curBeat === 0, beatStep, beatInterval);
           for (let b = 0; b < 4; b++) {
             const box = document.getElementById('beatBox' + b);
             if (box) box.classList.toggle('active', b === curBeat);
@@ -3811,6 +4119,7 @@
       state.recentMisses = [];
       state.stats = { perfect: 0, good: 0, shallow: 0, recoil: 0, miss: 0, combo: 0, maxCombo: 0 };
       sendFpgaByte(0x52); // 通知 FPGA 右側七段計數器歸零
+      syncCustomAudioPlayback('start');
 
       updateStatsUI();
       updateHeaderTitles();
@@ -3828,6 +4137,7 @@
       if (!state.running || state.paused) return;
       state.paused = true;
       state.isPressing = false;
+      syncCustomAudioPlayback('pause');
 
       let forgiven = 0;
       const cutoff = state.elapsed - 1.25;
@@ -3859,6 +4169,7 @@
     function resumeSession() {
       unlockAudio();
       state.paused = false;
+      syncCustomAudioPlayback('resume');
       document.getElementById('pauseModal').classList.add('hidden');
     }
 
@@ -3866,6 +4177,7 @@
       state.running = false;
       state.paused = false;
       state.isPressing = false;
+      syncCustomAudioPlayback('stop');
       document.getElementById('pauseModal').classList.add('hidden');
 
       const { total, acc } = computeAccuracyAndTotal();
@@ -4095,33 +4407,107 @@
       btn.addEventListener('click', () => setViewMode(btn.dataset.pickView));
     });
 
+    const TRACK_NAMES = {
+      stayin: "Stayin' Alive 迪斯可律動",
+      golden: '黃金急救標準電音節拍',
+      rush: '急診室合成波衝刺',
+      custom: '自選 MP3 音樂檔'
+    };
+
+    function applyModeSelection(modeVal) {
+      state.mode = modeVal;
+      document.querySelectorAll('#modeGroup .pill-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === modeVal));
+      document.querySelectorAll('#startModeGroup .start-pill-btn').forEach(b => b.classList.toggle('active', b.dataset.startMode === modeVal));
+      updateHeaderTitles();
+      if (state.running) startSession();
+    }
+
+    function applyTimeSelection(secVal) {
+      state.duration = parseInt(secVal, 10);
+      document.querySelectorAll('#timeGroup .pill-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.sec, 10) === state.duration));
+      document.querySelectorAll('#startTimeGroup .start-pill-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.startSec, 10) === state.duration));
+      if (state.running) startSession();
+    }
+
+    function applyBpmSelection(bpmVal) {
+      state.bpmMode = bpmVal;
+      document.querySelectorAll('#bpmGroup .pill-btn').forEach(b => b.classList.toggle('active', b.dataset.bpm === bpmVal));
+      document.querySelectorAll('#startBpmGroup .start-pill-btn').forEach(b => b.classList.toggle('active', b.dataset.startBpm === bpmVal));
+      updateHeaderTitles();
+    }
+
+    function applyTrackSelection(trackVal, fromHeader = false) {
+      state.track = trackVal;
+      const startSel = document.getElementById('startTrackSelect');
+      const headerSel = document.getElementById('headerTrackSelect');
+      if (startSel && startSel.value !== trackVal) startSel.value = trackVal;
+      if (headerSel && headerSel.value !== trackVal) headerSel.value = trackVal;
+      const mp3Row = document.getElementById('startCustomMp3Row');
+      if (mp3Row) mp3Row.classList.toggle('hidden', trackVal !== 'custom');
+
+      const customPlayer = document.getElementById('customAudioPlayer');
+      if (trackVal === 'custom') {
+        if (fromHeader && (!customPlayer || !customPlayer.src)) {
+          const fileInput = document.getElementById('customAudioFileInput');
+          if (fileInput) fileInput.click();
+        }
+        if (state.running && !state.paused) syncCustomAudioPlayback('start');
+      } else {
+        syncCustomAudioPlayback('stop');
+      }
+      showSysToast(`🎵 音樂已切換：${TRACK_NAMES[trackVal] || trackVal}`);
+    }
+
     document.querySelectorAll('#modeGroup .pill-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('#modeGroup .pill-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        state.mode = btn.dataset.mode;
-        updateHeaderTitles();
-        if (state.running) startSession();
-      });
+      btn.addEventListener('click', () => applyModeSelection(btn.dataset.mode));
+    });
+    document.querySelectorAll('#startModeGroup .start-pill-btn').forEach(btn => {
+      btn.addEventListener('click', () => applyModeSelection(btn.dataset.startMode));
     });
 
     document.querySelectorAll('#timeGroup .pill-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('#timeGroup .pill-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        state.duration = parseInt(btn.dataset.sec, 10);
-        if (state.running) startSession();
-      });
+      btn.addEventListener('click', () => applyTimeSelection(btn.dataset.sec));
+    });
+    document.querySelectorAll('#startTimeGroup .start-pill-btn').forEach(btn => {
+      btn.addEventListener('click', () => applyTimeSelection(btn.dataset.startSec));
     });
 
     document.querySelectorAll('#bpmGroup .pill-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('#bpmGroup .pill-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        state.bpmMode = btn.dataset.bpm;
-        updateHeaderTitles();
-      });
+      btn.addEventListener('click', () => applyBpmSelection(btn.dataset.bpm));
     });
+    document.querySelectorAll('#startBpmGroup .start-pill-btn').forEach(btn => {
+      btn.addEventListener('click', () => applyBpmSelection(btn.dataset.startBpm));
+    });
+
+    const startTrackSel = document.getElementById('startTrackSelect');
+    if (startTrackSel) {
+      startTrackSel.addEventListener('change', (e) => applyTrackSelection(e.target.value, false));
+    }
+    const headerTrackSel = document.getElementById('headerTrackSelect');
+    if (headerTrackSel) {
+      headerTrackSel.addEventListener('change', (e) => applyTrackSelection(e.target.value, true));
+    }
+    const customAudioInput = document.getElementById('customAudioFileInput');
+    if (customAudioInput) {
+      customAudioInput.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const player = document.getElementById('customAudioPlayer');
+        if (player) player.src = URL.createObjectURL(file);
+        const nameEl = document.getElementById('customAudioFileName');
+        if (nameEl) nameEl.textContent = `已載入：${file.name}`;
+        showSysToast(`📂 已載入自訂音樂：${file.name}`);
+        if (state.running && !state.paused && state.track === 'custom') {
+          syncCustomAudioPlayback('start');
+        }
+      });
+    }
+    const btnStartOpenStudio = document.getElementById('btnStartOpenStudio');
+    if (btnStartOpenStudio) {
+      btnStartOpenStudio.addEventListener('click', () => {
+        document.getElementById('studioModal').classList.remove('hidden');
+      });
+    }
 
     document.getElementById('btnMute').addEventListener('click', () => {
       state.muted = !state.muted;
@@ -4129,6 +4515,13 @@
       btn.textContent = state.muted ? '🔇' : '🔊';
       btn.classList.toggle('muted', state.muted);
       if (state.muted) stopBonus1Sfx();
+      const customPlayer = document.getElementById('customAudioPlayer');
+      if (customPlayer) {
+        customPlayer.muted = state.muted;
+        if (!state.muted && state.running && !state.paused && state.mode === 'game' && state.track === 'custom' && customPlayer.src) {
+          customPlayer.play().catch(() => {});
+        }
+      }
     });
 
     document.getElementById('btnSerial').addEventListener('click', toggleSerialConnection);
