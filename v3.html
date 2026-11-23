@@ -2436,9 +2436,9 @@
           <img class="studio-thumb-char" src="nurse_start.gif" alt="溫柔護理師" />
           <span>👩‍⚕️ 溫柔護理師</span>
         </button>
-        <button class="studio-option" data-char-key="cheer1" data-char-label="啦啦隊 Cheer1">
-          <img class="studio-thumb-char" src="Cheer1.gif" alt="啦啦隊 Cheer1" />
-          <span>📣 啦啦隊 Cheer1</span>
+        <button class="studio-option" data-char-key="cheer1" data-char-label="熱血啦啦隊">
+          <img class="studio-thumb-char" src="Cheer1.gif" alt="熱血啦啦隊" />
+          <span>📣 熱血啦啦隊</span>
         </button>
         <button class="studio-option" data-char-key="paramedic" data-char-label="熱血急救員">
           <img class="studio-thumb-char" src="Cheer2.gif" alt="熱血急救員" />
@@ -2615,7 +2615,7 @@
       <div class="modal-actions">
         <div class="modal-actions-row">
           <button class="modal-btn modal-btn-primary" id="btnPlayAgain">🔄 再測一次</button>
-          <button class="modal-btn modal-btn-secondary" id="btnSwitchAndPlay">🔀 切換下個模式重玩</button>
+          <button class="modal-btn modal-btn-secondary" id="btnSwitchAndPlay">🎛️ 返回選擇畫面</button>
         </div>
       </div>
     </div>
@@ -4558,9 +4558,11 @@
     document.getElementById('btnRestartFromPause').addEventListener('click', startSession);
     document.getElementById('btnPlayAgain').addEventListener('click', startSession);
     document.getElementById('btnSwitchAndPlay').addEventListener('click', () => {
-      const nextIdx = (VIEW_ORDER.indexOf(state.viewMode) + 1) % VIEW_ORDER.length;
-      setViewMode(VIEW_ORDER[nextIdx]);
-      startSession();
+      document.getElementById('resultModal').classList.add('hidden');
+      document.getElementById('pauseModal').classList.add('hidden');
+      document.getElementById('studioModal').classList.add('hidden');
+      document.getElementById('startModal').classList.remove('hidden');
+      updateStartFpgaUI();
     });
 
     function bindActionButton(id, type) {
